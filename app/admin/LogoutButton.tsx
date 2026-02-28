@@ -1,0 +1,14 @@
+"use client";
+
+export default function LogoutButton() {
+  return (
+    <button
+      onClick={() => {
+        window.location.href = "/api/admin/login";
+      }}
+      className="text-zinc-400 hover:text-white transition-colors text-sm"
+    >
+      로그아웃
+    </button>
+  );
+}

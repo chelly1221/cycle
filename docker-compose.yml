@@ -1,0 +1,41 @@
+version: "3.9"
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: cycle_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: cycle
+      POSTGRES_USER: cycle_user
+      POSTGRES_PASSWORD: cycle_pass
+    volumes:
+      - cycle_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cycle_user -d cycle"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: cycle_app
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      DATABASE_URL: postgresql://cycle_user:cycle_pass@db:5432/cycle
+      NODE_ENV: production
+    env_file:
+      - .env
+    depends_on:
+      db:
+        condition: service_healthy
+    command: >
+      sh -c "node node_modules/prisma/build/index.js db push --skip-generate --accept-data-loss && node server.js"
+
+volumes:
+  cycle_pgdata:
+    driver: local

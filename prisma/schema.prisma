@@ -1,0 +1,127 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Rides ────────────────────────────────────────────────────────────────────
+
+model Ride {
+  id           String   @id @default(cuid())
+  stravaId     BigInt   @unique @map("strava_id")
+  name         String
+  slug         String   @unique
+  type         RideType @default(RIDE)
+
+  // Geography
+  country      String?
+  countryCode  String?  @map("country_code") @db.Char(2)
+  region       String?
+  startLat     Float?   @map("start_lat")
+  startLng     Float?   @map("start_lng")
+
+  // Core stats — stored in SI units (metres, seconds)
+  distanceM      Float @map("distance_m")
+  elevationM     Float @map("elevation_m")
+  movingTimeSec  Int   @map("moving_time_sec")
+  elapsedTimeSec Int   @map("elapsed_time_sec")
+
+  // Route data
+  polyline       String? @db.Text @map("polyline")
+  polylineDetail String? @db.Text @map("polyline_detail")
+
+  // Elevation profile — array of {distance, altitude} pairs stored as JSON
+  elevationProfile Json? @map("elevation_profile")
+
+  // Metadata
+  startedAt   DateTime @map("started_at")
+  description String?  @db.Text
+  story       String?  @db.Text
+
+  // Strava extras
+  averageSpeed     Float? @map("average_speed")
+  maxSpeed         Float? @map("max_speed")
+  averageWatts     Float? @map("average_watts")
+  weightedAvgWatts Float? @map("weighted_avg_watts")
+  kudosCount       Int    @default(0) @map("kudos_count")
+
+  // Relationships
+  media Media[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([country])
+  @@index([startedAt])
+  @@index([type])
+  @@map("rides")
+}
+
+enum RideType {
+  RIDE
+  VIRTUAL_RIDE
+  MOUNTAIN_BIKE_RIDE
+  E_BIKE_RIDE
+  GRAVEL_RIDE
+  HANDCYCLE
+  OTHER
+}
+
+// ─── Strava OAuth Tokens ──────────────────────────────────────────────────────
+
+model StravaToken {
+  id           String   @id @default(cuid())
+  athleteId    BigInt   @unique @map("athlete_id")
+  accessToken  String   @db.Text @map("access_token")
+  refreshToken String   @db.Text @map("refresh_token")
+  expiresAt    DateTime @map("expires_at")
+  scope        String?
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("strava_tokens")
+}
+
+// ─── Media ────────────────────────────────────────────────────────────────────
+
+model Media {
+  id     String @id @default(cuid())
+  rideId String @map("ride_id")
+  ride   Ride   @relation(fields: [rideId], references: [id], onDelete: Cascade)
+
+  type         MediaType
+  url          String  @db.Text
+  embedCode    String? @db.Text @map("embed_code")
+  title        String?
+  thumbnailUrl String? @map("thumbnail_url")
+  sortOrder    Int     @default(0) @map("sort_order")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([rideId])
+  @@map("media")
+}
+
+enum MediaType {
+  YOUTUBE
+  INSTAGRAM
+  STRAVA_ACTIVITY
+}
+
+// ─── Site Settings (singleton) ──────────────────────────────────────────────
+
+model SiteSettings {
+  id                       String    @id @default("default")
+  stravaClientId           String?   @map("strava_client_id")
+  stravaClientSecret       String?   @map("strava_client_secret")
+  stravaWebhookId          Int?      @map("strava_webhook_id")
+  stravaWebhookVerifyToken String?   @map("strava_webhook_verify_token")
+  lastSyncedAt             DateTime? @map("last_synced_at")
+  updatedAt                DateTime  @updatedAt @map("updated_at")
+
+  @@map("site_settings")
+}

@@ -1,0 +1,92 @@
+const en = {
+  nav: {
+    brand: "3chan's Cycling Journey",
+    rides: 'Rides',
+    ledger: 'The Ledger',
+  },
+  footer: 'Built with Strava data',
+  home: {
+    label: 'Cycling Archive',
+    tagline: 'Every Road Tells a Story',
+    mapLoading: 'Loading map...',
+    stats: {
+      km: 'total distance',
+      elevation: 'elevation gain',
+      hours: 'moving time',
+      rides: 'rides',
+      countries: 'countries visited',
+      units: { km: 'km', elevation: 'm', hours: 'h', rides: '', countries: '' },
+    },
+    roadsRidden: 'Roads Ridden',
+    empty: 'No rides synced yet. Run {cmd} after connecting Strava on {link}.',
+  },
+  rides: {
+    title: 'All Rides',
+    count: '{n} rides in the archive',
+    allCountries: 'All countries',
+    allRegions: 'All regions',
+    empty: 'No rides found.',
+    units: { km: 'km', elev: 'm elev', moving: 'moving', unknown: 'Unknown' },
+  },
+  ride: {
+    distance: 'Distance',
+    elevation: 'Elevation',
+    movingTime: 'Moving time',
+    avgSpeed: 'Avg speed',
+    route: 'Route',
+    elevationProfile: 'Elevation Profile',
+    theRide: 'The Ride',
+  },
+  dashboard: {
+    title: 'The Ledger',
+    subtitle: 'Cumulative cycling statistics',
+    connectStrava: 'Connect Strava',
+    connectedBanner: 'Strava connected successfully. Run {cmd} to import your rides.',
+    errorBanner: 'Strava connection error: {error}',
+    stats: {
+      km: 'km total',
+      elevation: 'm climbed',
+      hours: 'hours',
+      rides: 'rides',
+      countries: 'countries',
+    },
+    yearByYear: 'Year by Year',
+    byCountry: 'By Country',
+    table: { country: 'Country', rides: 'Rides', distance: 'Distance', elevation: 'Elevation' },
+    topClimbs: 'Top Climbs by Elevation',
+    empty: 'No rides yet. Connect Strava above, then run {cmd}.',
+  },
+  charts: {
+    elevation: { label: 'Elevation', kmSuffix: ' km' },
+    yearly: {
+      distance: { label: 'Distance', unit: 'km' },
+      elevation: { label: 'Elevation', unit: 'm' },
+      rides: { label: 'Rides', unit: '' },
+    },
+  },
+  map: { rides: 'rides', km: 'km' },
+  embeds: { viewOnInstagram: 'View on Instagram', rideFilm: 'Ride Film' },
+  globe: {
+    mediaPanel: {
+      distance: 'Distance',
+      elevation: 'Elevation',
+      movingTime: 'Moving time',
+      viewRide: 'View full ride',
+      close: 'Close',
+    },
+  },
+  errors: {
+    somethingWentWrong: 'Something went wrong',
+    tryAgain: 'Try again',
+    notFound: 'Road not found',
+    backToArchive: 'Back to the archive',
+  },
+  meta: {
+    titleTemplate: "%s | 3chan's Cycling Journey",
+    defaultTitle: "3chan's Cycling Journey",
+    description: 'Every road tells a story.',
+    siteName: "3chan's Cycling Journey",
+  },
+}
+
+export default en

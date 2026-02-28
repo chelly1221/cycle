@@ -1,0 +1,92 @@
+const ko = {
+  nav: {
+    brand: '3chan의 자전거 여행',
+    rides: '라이드',
+    ledger: '기록부',
+  },
+  footer: 'Strava 데이터로 제작',
+  home: {
+    label: '사이클링 아카이브',
+    tagline: '모든 도로에는 이야기가 있다',
+    mapLoading: '지도 불러오는 중...',
+    stats: {
+      km: '누적거리',
+      elevation: '획득고도',
+      hours: '이동시간',
+      rides: '주행횟수',
+      countries: '방문국가',
+      units: { km: 'km', elevation: 'm', hours: 'h', rides: '회', countries: '개국' },
+    },
+    roadsRidden: '달린 도로',
+    empty: 'Strava를 연동한 후 {cmd}를 실행하세요. {link}에서 연동할 수 있습니다.',
+  },
+  rides: {
+    title: '전체 라이드',
+    count: '아카이브에 {n}개의 라이드',
+    allCountries: '전체 국가',
+    allRegions: '전체 지역',
+    empty: '라이드를 찾을 수 없습니다.',
+    units: { km: 'km', elev: 'm 고도', moving: '이동', unknown: '알 수 없음' },
+  },
+  ride: {
+    distance: '거리',
+    elevation: '고도',
+    movingTime: '이동 시간',
+    avgSpeed: '평균 속도',
+    route: '경로',
+    elevationProfile: '고도 프로필',
+    theRide: '라이드 스토리',
+  },
+  dashboard: {
+    title: '기록부',
+    subtitle: '누적 사이클링 통계',
+    connectStrava: 'Strava 연동',
+    connectedBanner: 'Strava가 연동되었습니다. {cmd}를 실행하여 라이드를 가져오세요.',
+    errorBanner: 'Strava 연동 오류: {error}',
+    stats: {
+      km: 'km 총 주행',
+      elevation: 'm 등반',
+      hours: '시간',
+      rides: '라이드',
+      countries: '개국',
+    },
+    yearByYear: '연도별',
+    byCountry: '국가별',
+    table: { country: '국가', rides: '라이드', distance: '거리', elevation: '고도' },
+    topClimbs: '최고 고도 클라임',
+    empty: 'Strava를 연동한 후 {cmd}를 실행하세요.',
+  },
+  charts: {
+    elevation: { label: '고도', kmSuffix: ' km' },
+    yearly: {
+      distance: { label: '거리', unit: 'km' },
+      elevation: { label: '고도', unit: 'm' },
+      rides: { label: '라이드', unit: '' },
+    },
+  },
+  map: { rides: '라이드', km: 'km' },
+  embeds: { viewOnInstagram: '인스타그램에서 보기', rideFilm: '라이드 영상' },
+  globe: {
+    mediaPanel: {
+      distance: '거리',
+      elevation: '고도',
+      movingTime: '이동 시간',
+      viewRide: '라이드 보기',
+      close: '닫기',
+    },
+  },
+  errors: {
+    somethingWentWrong: '오류가 발생했습니다',
+    tryAgain: '다시 시도',
+    notFound: '도로를 찾을 수 없습니다',
+    backToArchive: '아카이브로 돌아가기',
+  },
+  meta: {
+    titleTemplate: '%s | 3chan의 자전거 여행',
+    defaultTitle: '3chan의 자전거 여행',
+    description: '모든 도로에는 이야기가 있다.',
+    siteName: '3chan의 자전거 여행',
+  },
+}
+
+export default ko

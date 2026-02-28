@@ -1,0 +1,39 @@
+{
+  "name": "cycle",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "sync:strava": "ts-node --project tsconfig.scripts.json scripts/sync-strava.ts",
+    "postinstall": "prisma generate"
+  },
+  "dependencies": {
+    "@prisma/client": "^5.22.0",
+    "dotenv": "^16.4.5",
+    "leaflet": "^1.9.4",
+    "next": "14.2.35",
+    "polyline-encoded": "^0.0.9",
+    "react": "^18",
+    "react-dom": "^18",
+    "recharts": "^2.13.3",
+    "three": "^0.183.1"
+  },
+  "devDependencies": {
+    "@types/geojson": "^7946.0.14",
+    "@types/leaflet": "^1.9.14",
+    "@types/node": "^20",
+    "@types/react": "^18",
+    "@types/react-dom": "^18",
+    "eslint": "^8",
+    "eslint-config-next": "14.2.35",
+    "postcss": "^8",
+    "prisma": "^5.22.0",
+    "tailwindcss": "^3.4.1",
+    "ts-node": "^10.9.2",
+    "tsconfig-paths": "^4.2.0",
+    "typescript": "^5"
+  }
+}
