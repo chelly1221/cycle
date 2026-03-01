@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { fetchActivities, fetchActivityDetail } from "@/lib/strava";
-import { upsertRide } from "@/lib/sync-helpers";
+import { upsertRide, isCyclingActivity } from "@/lib/sync-helpers";
 import { db } from "@/lib/db";
 
 function isAuthorized(req: NextRequest): boolean {
@@ -33,6 +33,9 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: "stravaId required for single mode" }, { status: 400 });
       }
       const detail = await fetchActivityDetail(stravaId);
+      if (!isCyclingActivity(detail)) {
+        return NextResponse.json({ synced: 0, skipped: 1, errors: 0, total: 1, mode, reason: "not cycling" });
+      }
       await upsertRide(detail);
       return NextResponse.json({ synced: 1, errors: 0, total: 1, mode });
     }
@@ -65,7 +68,12 @@ export async function POST(request: NextRequest) {
     let synced = 0;
     let errors = 0;
 
+    let skipped = 0;
     for (const activity of activities) {
+      if (!isCyclingActivity(activity)) {
+        skipped++;
+        continue;
+      }
       try {
         await upsertRide(activity);
         synced++;
@@ -82,7 +90,7 @@ export async function POST(request: NextRequest) {
       update: { lastSyncedAt: new Date() },
     });
 
-    return NextResponse.json({ synced, errors, total: activities.length, mode });
+    return NextResponse.json({ synced, skipped, errors, total: activities.length, mode });
   } catch (err) {
     console.error("Sync error:", err);
     return NextResponse.json({ error: "Sync failed" }, { status: 500 });

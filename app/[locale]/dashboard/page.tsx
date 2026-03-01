@@ -13,6 +13,7 @@ import {
   getRideTypeBreakdown,
   getMonthlyBreakdown,
   getStreaks,
+  getCountryTimeline,
 } from '@/lib/stats'
 import YearlyChart from '@/components/charts/YearlyChart'
 import dynamicImport from 'next/dynamic'
@@ -62,6 +63,7 @@ export default async function DashboardPage({
     rideTypes,
     monthlyBreakdown,
     streaks,
+    countryTimeline,
     d,
   ] = await Promise.all([
     getGlobalStats(),
@@ -78,6 +80,7 @@ export default async function DashboardPage({
     getRideTypeBreakdown(),
     getMonthlyBreakdown(),
     getStreaks(),
+    getCountryTimeline(),
     getDictionary(locale),
   ])
 
@@ -349,7 +352,57 @@ export default async function DashboardPage({
         </section>
       )}
 
-      {/* 10. Country Breakdown (existing) */}
+      {/* 10. Country Visit Timeline */}
+      {countryTimeline.length > 0 && (
+        <section className="mb-12">
+          <h2 className="text-lg font-semibold text-white mb-4">{d.dashboard.countryTimeline.title}</h2>
+          <div className="relative pl-6">
+            {/* Vertical line */}
+            <div className="absolute left-[9px] top-2 bottom-2 w-px bg-gray-800" />
+            <div className="space-y-6">
+              {countryTimeline.map((cv, i) => {
+                const flag = cv.countryCode
+                  ? String.fromCodePoint(
+                      ...cv.countryCode.toUpperCase().split('').map((c) => 0x1f1e6 + c.charCodeAt(0) - 65)
+                    )
+                  : '';
+                const [y, m, dd] = cv.firstVisitDate.split('-');
+                const dateLabel = `${y}.${m}.${dd}`;
+                return (
+                  <div key={cv.country} className="relative">
+                    {/* Node dot */}
+                    <div className="absolute -left-6 top-1 w-[18px] h-[18px] rounded-full border-2 border-strava bg-gray-950 flex items-center justify-center">
+                      <div className="w-2 h-2 rounded-full bg-strava" />
+                    </div>
+                    <div className="flex items-start gap-3">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs text-gray-500 font-mono">{dateLabel}</p>
+                        <p className="text-white font-medium mt-0.5">
+                          {flag && <span className="mr-1.5">{flag}</span>}
+                          {getCountryName(cv.countryCode, locale, cv.country)}
+                        </p>
+                        <div className="flex items-center gap-2 mt-1">
+                          <a
+                            href={`/${locale}/rides/${countryToSlug(cv.country)}/${cv.firstRideSlug}`}
+                            className="text-xs text-gray-400 hover:text-strava transition-colors truncate"
+                          >
+                            {d.dashboard.countryTimeline.firstRide}: {cv.firstRideName}
+                          </a>
+                          <span className="text-xs text-gray-600 shrink-0">
+                            · {cv.totalRides}{d.dashboard.countryTimeline.rides}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* 11. Country Breakdown (existing) */}
       {countries.length > 0 && (
         <section className="mb-12">
           <h2 className="text-lg font-semibold text-white mb-4">{d.dashboard.byCountry}</h2>

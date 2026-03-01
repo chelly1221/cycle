@@ -18,13 +18,13 @@ const GlobeScene = dynamicImport(() => import('@/components/three/GlobeScene'), 
 })
 
 export default async function HomePage({ params }: { params: { locale: Locale } }) {
-  const EXCLUDE = { excludeTypes: [RideType.VIRTUAL_RIDE] }
+  const EXCLUDE = { excludeTypes: [RideType.VIRTUAL_RIDE, RideType.OTHER] }
   const [stats, countries, d, ridesWithPolyline, ridesWithMedia] = await Promise.all([
     getGlobalStats(EXCLUDE),
     getCountryBreakdown(EXCLUDE),
     getDictionary(params.locale),
     db.ride.findMany({
-      where: { polyline: { not: null }, type: { not: RideType.VIRTUAL_RIDE } },
+      where: { polyline: { not: null }, type: { notIn: [RideType.VIRTUAL_RIDE, RideType.OTHER] } },
       select: { polyline: true },
     }),
     db.ride.findMany({
@@ -32,7 +32,7 @@ export default async function HomePage({ params }: { params: { locale: Locale } 
         startLat: { not: null },
         startLng: { not: null },
         media: { some: {} },
-        type: { not: RideType.VIRTUAL_RIDE },
+        type: { notIn: [RideType.VIRTUAL_RIDE, RideType.OTHER] },
       },
       select: {
         id: true, name: true, slug: true, country: true, countryCode: true,

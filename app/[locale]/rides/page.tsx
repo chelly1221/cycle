@@ -49,7 +49,7 @@ export default async function RidesPage({
       where.name = { startsWith: searchParams.program }
     }
   } else {
-    where.type = { not: RideType.VIRTUAL_RIDE }
+    where.type = { notIn: [RideType.VIRTUAL_RIDE, RideType.OTHER] }
     if (searchParams.region) {
       const region = getRegionByKey(searchParams.region)
       if (region) where.countryCode = { in: region.codes }
@@ -77,7 +77,7 @@ export default async function RidesPage({
     }),
     db.ride.groupBy({
       by: ['country', 'countryCode'],
-      where: { country: { not: null }, countryCode: { not: null }, type: { not: RideType.VIRTUAL_RIDE } },
+      where: { country: { not: null }, countryCode: { not: null }, type: { notIn: [RideType.VIRTUAL_RIDE, RideType.OTHER] } },
     }),
     db.ride.findMany({
       where: { type: RideType.VIRTUAL_RIDE },

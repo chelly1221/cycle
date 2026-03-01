@@ -106,12 +106,32 @@ export interface StreakResult {
   longestStreakEnd: string | null;
 }
 
+export interface CountryFirstVisit {
+  country: string;
+  countryCode: string | null;
+  firstVisitDate: string; // YYYY-MM-DD
+  firstRideName: string;
+  firstRideSlug: string;
+  totalRides: number;
+}
+
+// ─── Shared Filters ──────────────────────────────────────────────────────────
+
+/** Non-cycling sports (mapped to OTHER from Strava) — excluded from all queries */
+const NON_CYCLING = [RideType.OTHER];
+/** Virtual rides — additionally excluded from country/outdoor-specific queries */
+const NON_OUTDOOR = [...NON_CYCLING, RideType.VIRTUAL_RIDE];
+
+const CYCLING_ONLY = { type: { notIn: NON_CYCLING } };
+const OUTDOOR_ONLY = { type: { notIn: NON_OUTDOOR } };
+
 // ─── Queries ──────────────────────────────────────────────────────────────────
 
 export async function getGlobalStats(options?: { excludeTypes?: RideType[] }): Promise<GlobalStats> {
-  const typeFilter = options?.excludeTypes?.length
-    ? { type: { notIn: options.excludeTypes } }
-    : {}
+  const excluded = options?.excludeTypes?.length
+    ? Array.from(new Set([...NON_CYCLING, ...options.excludeTypes]))
+    : NON_CYCLING;
+  const typeFilter = { type: { notIn: excluded } };
   const [agg, countries] = await Promise.all([
     db.ride.aggregate({
       where: typeFilter,
@@ -134,9 +154,10 @@ export async function getGlobalStats(options?: { excludeTypes?: RideType[] }): P
 }
 
 export async function getCountryBreakdown(options?: { excludeTypes?: RideType[] }): Promise<CountryBreakdown[]> {
-  const typeFilter = options?.excludeTypes?.length
-    ? { type: { notIn: options.excludeTypes } }
-    : {}
+  const excluded = options?.excludeTypes?.length
+    ? Array.from(new Set([...NON_OUTDOOR, ...options.excludeTypes]))
+    : NON_OUTDOOR;
+  const typeFilter = { type: { notIn: excluded } };
   const groups = await db.ride.groupBy({
     by: ["country", "countryCode"],
     where: { country: { not: null }, ...typeFilter },
@@ -171,6 +192,7 @@ export async function getYearlyStats(): Promise<YearlyStat[]> {
       COALESCE(SUM(elevation_m), 0)      AS elevation_m,
       COALESCE(SUM(moving_time_sec), 0)::int AS moving_time_sec
     FROM rides
+    WHERE type != 'OTHER'
     GROUP BY year
     ORDER BY year DESC
   `;
@@ -186,6 +208,7 @@ export async function getYearlyStats(): Promise<YearlyStat[]> {
 
 export async function getTopClimbs(limit = 10): Promise<TopClimb[]> {
   const rides = await db.ride.findMany({
+    where: CYCLING_ONLY,
     select: {
       id: true,
       name: true,
@@ -209,6 +232,7 @@ export async function getTopClimbs(limit = 10): Promise<TopClimb[]> {
 
 export async function getTopRidesByDistance(limit = 10): Promise<TopRide[]> {
   const rides = await db.ride.findMany({
+    where: CYCLING_ONLY,
     select: {
       id: true,
       name: true,
@@ -232,6 +256,7 @@ export async function getTopRidesByDistance(limit = 10): Promise<TopRide[]> {
 
 export async function getEddingtonNumber(): Promise<EddingtonResult> {
   const rides = await db.ride.findMany({
+    where: CYCLING_ONLY,
     select: { distanceM: true },
     orderBy: { distanceM: "desc" },
   });
@@ -256,14 +281,14 @@ export async function getPersonalRecords(): Promise<PersonalRecords> {
   const fields = { name: true, slug: true, country: true, countryCode: true } as const;
 
   const [longest, mostElev, fastest, longestTime] = await Promise.all([
-    db.ride.findFirst({ select: { distanceM: true, ...fields }, orderBy: { distanceM: "desc" } }),
-    db.ride.findFirst({ select: { elevationM: true, ...fields }, orderBy: { elevationM: "desc" } }),
+    db.ride.findFirst({ where: CYCLING_ONLY, select: { distanceM: true, ...fields }, orderBy: { distanceM: "desc" } }),
+    db.ride.findFirst({ where: CYCLING_ONLY, select: { elevationM: true, ...fields }, orderBy: { elevationM: "desc" } }),
     db.ride.findFirst({
       select: { averageSpeed: true, ...fields },
-      where: { averageSpeed: { not: null } },
+      where: { ...CYCLING_ONLY, averageSpeed: { not: null } },
       orderBy: { averageSpeed: "desc" },
     }),
-    db.ride.findFirst({ select: { movingTimeSec: true, ...fields }, orderBy: { movingTimeSec: "desc" } }),
+    db.ride.findFirst({ where: CYCLING_ONLY, select: { movingTimeSec: true, ...fields }, orderBy: { movingTimeSec: "desc" } }),
   ]);
 
   return {
@@ -288,6 +313,7 @@ function pick(r: { name: string; slug: string; country: string | null; countryCo
 
 export async function getAverageRideStats(): Promise<AverageRideStats> {
   const agg = await db.ride.aggregate({
+    where: CYCLING_ONLY,
     _avg: { distanceM: true, elevationM: true, averageSpeed: true, movingTimeSec: true },
   });
 
@@ -301,9 +327,9 @@ export async function getAverageRideStats(): Promise<AverageRideStats> {
 
 export async function getCenturyCounts(): Promise<CenturyCounts> {
   const [c100, c200, c300] = await Promise.all([
-    db.ride.count({ where: { distanceM: { gte: 100000 } } }),
-    db.ride.count({ where: { distanceM: { gte: 200000 } } }),
-    db.ride.count({ where: { distanceM: { gte: 300000 } } }),
+    db.ride.count({ where: { ...CYCLING_ONLY, distanceM: { gte: 100000 } } }),
+    db.ride.count({ where: { ...CYCLING_ONLY, distanceM: { gte: 200000 } } }),
+    db.ride.count({ where: { ...CYCLING_ONLY, distanceM: { gte: 300000 } } }),
   ]);
 
   return { century100: c100, century200: c200, century300: c300 };
@@ -318,7 +344,8 @@ export async function getDailyRideCounts(days = 365): Promise<DailyRideCount[]> 
       COUNT(*)::int AS rides,
       COALESCE(SUM(distance_m), 0) AS distance_m
     FROM rides
-    WHERE started_at >= NOW() - MAKE_INTERVAL(days => ${days}::int)
+    WHERE type != 'OTHER'
+      AND started_at >= NOW() - MAKE_INTERVAL(days => ${days}::int)
     GROUP BY date
     ORDER BY date
   `;
@@ -338,6 +365,7 @@ export async function getCumulativeDistance(): Promise<CumulativePoint[]> {
       TO_CHAR(started_at, 'YYYY-MM-DD') AS date,
       SUM(distance_m) OVER (ORDER BY started_at) AS cumulative_m
     FROM rides
+    WHERE type != 'OTHER'
     ORDER BY started_at
   `;
 
@@ -362,6 +390,7 @@ export async function getCumulativeDistance(): Promise<CumulativePoint[]> {
 export async function getRideTypeBreakdown(): Promise<RideTypeCount[]> {
   const groups = await db.ride.groupBy({
     by: ["type"],
+    where: CYCLING_ONLY,
     _count: { id: true },
     _sum: { distanceM: true },
     orderBy: { _count: { id: "desc" } },
@@ -384,6 +413,7 @@ export async function getMonthlyBreakdown(): Promise<MonthlyBreakdown[]> {
       COALESCE(SUM(distance_m), 0) AS distance_m,
       COALESCE(SUM(elevation_m), 0) AS elevation_m
     FROM rides
+    WHERE type != 'OTHER'
     GROUP BY month
     ORDER BY month
   `;
@@ -396,12 +426,63 @@ export async function getMonthlyBreakdown(): Promise<MonthlyBreakdown[]> {
   }));
 }
 
+export async function getCountryTimeline(): Promise<CountryFirstVisit[]> {
+  const rows = await db.$queryRaw<
+    Array<{
+      country: string;
+      country_code: string | null;
+      first_visit_date: string;
+      first_ride_name: string;
+      first_ride_slug: string;
+      total_rides: bigint;
+    }>
+  >`
+    SELECT
+      f.country,
+      f.country_code,
+      f.first_visit_date,
+      f.first_ride_name,
+      f.first_ride_slug,
+      c.total_rides
+    FROM (
+      SELECT DISTINCT ON (country)
+        country,
+        country_code,
+        TO_CHAR(started_at, 'YYYY-MM-DD') AS first_visit_date,
+        name AS first_ride_name,
+        slug AS first_ride_slug
+      FROM rides
+      WHERE country IS NOT NULL
+        AND type NOT IN ('OTHER', 'VIRTUAL_RIDE')
+      ORDER BY country, started_at ASC
+    ) f
+    JOIN (
+      SELECT country, COUNT(*) AS total_rides
+      FROM rides
+      WHERE country IS NOT NULL
+        AND type NOT IN ('OTHER', 'VIRTUAL_RIDE')
+      GROUP BY country
+    ) c ON c.country = f.country
+    ORDER BY f.first_visit_date ASC
+  `;
+
+  return rows.map((r) => ({
+    country: r.country,
+    countryCode: r.country_code,
+    firstVisitDate: r.first_visit_date,
+    firstRideName: r.first_ride_name,
+    firstRideSlug: r.first_ride_slug,
+    totalRides: Number(r.total_rides),
+  }));
+}
+
 export async function getStreaks(): Promise<StreakResult> {
   const rows = await db.$queryRaw<
     Array<{ date: string }>
   >`
     SELECT DISTINCT TO_CHAR(started_at, 'YYYY-MM-DD') AS date
     FROM rides
+    WHERE type != 'OTHER'
     ORDER BY date
   `;
 

@@ -71,8 +71,9 @@ Dockerfile               # Multi-stage production build
 **Strava → Database → Dashboard**
 1. User completes a ride on Strava.
 2. `scripts/sync-strava.ts` (or a cron job calling `/api/strava/sync`) fetches new activities via the Strava API v3.
-3. Activities are upserted into PostgreSQL via Prisma (`rides` table).
-4. `/dashboard` reads aggregated stats from the DB using `lib/stats.ts` helpers.
+3. **Only cycling activities are synced** — non-cycling sports (Run, Walk, Swim, etc.) are filtered out by `isCyclingActivity()` in `lib/sync-helpers.ts`. Allowed Strava types: Ride, VirtualRide, MountainBikeRide, EBikeRide, GravelRide, Handcycle.
+4. Activities are upserted into PostgreSQL via Prisma (`rides` table).
+5. `/dashboard` reads aggregated stats from the DB using `lib/stats.ts` helpers.
 
 **Strava OAuth**
 - Strava Client ID / Secret are stored in DB (`site_settings` table), managed via admin dashboard (`/admin`).
@@ -85,6 +86,12 @@ Dockerfile               # Multi-stage production build
 - `strava_tokens` — OAuth refresh/access token storage
 - `media` — YouTube URLs and Instagram post URLs linked to a ride
 
+### Activity Type Filtering
+- **Sync**: Only cycling sports are synced from Strava (`isCyclingActivity()` in `lib/sync-helpers.ts`). Non-cycling (Run, Walk, Swim, etc.) are skipped.
+- **All queries**: `lib/stats.ts` excludes `RideType.OTHER` from every query via shared `CYCLING_ONLY` filter.
+- **Country-specific queries** (country breakdown, country timeline): additionally exclude `RideType.VIRTUAL_RIDE` via `OUTDOOR_ONLY` filter.
+- **Homepage & rides list**: also exclude `OTHER` (and `VIRTUAL_RIDE` for outdoor views).
+
 ### Locale
 The site is **Korean-only** (`ko`). All user-facing routes live under `/ko/...`. Middleware redirects `/` and `/en/*` to `/ko/...`. The root `<html lang>` is hardcoded to `ko`. There is no English dictionary — `lib/i18n/ko.ts` is the sole translation file.
 
@@ -94,7 +101,7 @@ The site is **Korean-only** (`ko`). All user-facing routes live under `/ko/...`.
 | `/ko` | Cinematic hero, live global totals, interactive Leaflet world map |
 | `/ko/rides` | Grid of all rides, filterable by country / type |
 | `/ko/rides/[country]/[slug]` | Single ride: elevation chart, Mapbox/Leaflet route, YouTube embed, story, stats |
-| `/ko/dashboard` | Cumulative stats, country breakdown, top climbs, yearly chart |
+| `/ko/dashboard` | Cumulative stats, country visit timeline, country breakdown, top climbs, yearly chart |
 
 ### Map
 - **Leaflet.js** for the world map — countries fill/highlight based on rides ridden.

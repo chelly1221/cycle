@@ -14,6 +14,15 @@ function toSlug(name: string, date: Date, suffix?: number): string {
   return suffix ? `${base}-${dateStr}-${suffix}` : `${base}-${dateStr}`;
 }
 
+const CYCLING_STRAVA_TYPES = new Set([
+  'Ride', 'VirtualRide', 'MountainBikeRide', 'EBikeRide', 'GravelRide', 'Handcycle',
+]);
+
+export function isCyclingActivity(activity: StravaActivity): boolean {
+  const type = activity.sport_type ?? activity.type;
+  return CYCLING_STRAVA_TYPES.has(type);
+}
+
 function mapRideType(stravaType: string): RideType {
   const map: Record<string, RideType> = {
     Ride: RideType.RIDE,

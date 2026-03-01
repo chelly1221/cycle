@@ -113,6 +113,11 @@ const ko = {
       title: '월별 통계',
       months: ['1월', '2월', '3월', '4월', '5월', '6월', '7월', '8월', '9월', '10월', '11월', '12월'],
     },
+    countryTimeline: {
+      title: '국가 방문 타임라인',
+      firstRide: '첫 라이드',
+      rides: '회',
+    },
     streaks: {
       title: '연속 라이딩',
       longest: '최장 연속',

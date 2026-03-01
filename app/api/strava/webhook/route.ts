@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { fetchActivityDetail } from "@/lib/strava";
-import { upsertRide, deleteRideByStravaId } from "@/lib/sync-helpers";
+import { upsertRide, deleteRideByStravaId, isCyclingActivity } from "@/lib/sync-helpers";
 
 // ─── GET: Strava webhook subscription verification ─────────────────────────
 export async function GET(request: NextRequest) {
@@ -45,8 +45,12 @@ export async function POST(request: NextRequest) {
     if (event.aspect_type === "create" || event.aspect_type === "update") {
       try {
         const detail = await fetchActivityDetail(stravaId);
-        await upsertRide(detail);
-        console.log(`[Webhook] Upserted activity ${stravaId}`);
+        if (!isCyclingActivity(detail)) {
+          console.log(`[Webhook] Skipped non-cycling activity ${stravaId}`);
+        } else {
+          await upsertRide(detail);
+          console.log(`[Webhook] Upserted activity ${stravaId}`);
+        }
       } catch (err) {
         console.error(`[Webhook] Failed to upsert activity ${stravaId}:`, err);
       }
