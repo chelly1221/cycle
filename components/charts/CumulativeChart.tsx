@@ -30,22 +30,15 @@ function formatTooltipDate(dateStr: string): string {
 }
 
 export default function CumulativeChart({ data, labels = DEFAULT_LABELS }: Props) {
-  // Build a set of indices where the year changes — show full year there
-  const yearChangeIndices = new Set<number>()
-  yearChangeIndices.add(0)
-  for (let i = 1; i < data.length; i++) {
-    if (data[i].date.slice(0, 4) !== data[i - 1].date.slice(0, 4)) {
-      yearChangeIndices.add(i)
+  // Build year-only ticks: show only the first data point of each year
+  const yearTicks: string[] = []
+  let lastYear = ''
+  for (const d of data) {
+    const y = d.date.slice(0, 4)
+    if (y !== lastYear) {
+      yearTicks.push(d.date)
+      lastYear = y
     }
-  }
-
-  function formatTick(dateStr: string, index: number): string {
-    const [y, m] = dateStr.split('-')
-    const month = MONTHS[parseInt(m, 10) - 1] ?? ''
-    if (yearChangeIndices.has(index)) {
-      return `${month} '${y.slice(2)}`
-    }
-    return month
   }
 
   return (
@@ -60,8 +53,9 @@ export default function CumulativeChart({ data, labels = DEFAULT_LABELS }: Props
         <CartesianGrid strokeDasharray="3 3" stroke="#222" vertical={false} />
         <XAxis
           dataKey="date"
-          tickFormatter={formatTick}
-          tick={{ fill: '#666', fontSize: 11 }}
+          ticks={yearTicks}
+          tickFormatter={(dateStr: string) => dateStr.slice(0, 4)}
+          tick={{ fill: '#666', fontSize: 12 }}
           axisLine={{ stroke: '#333' }}
           tickLine={false}
         />
