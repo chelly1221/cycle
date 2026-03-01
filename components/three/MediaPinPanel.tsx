@@ -59,7 +59,7 @@ export default function MediaPinPanel({ pin, onClose, locale, labels }: Props) {
   const youtubeMedia = pin.media.filter(m => m.type === 'YOUTUBE')
   const instagramMedia = pin.media.filter(m => m.type === 'INSTAGRAM')
 
-  const countrySlug = pin.countryCode?.toLowerCase() || 'unknown'
+  const countrySlug = pin.country?.toLowerCase().replace(/\s+/g, '-') ?? 'unknown'
 
   return (
     <div
