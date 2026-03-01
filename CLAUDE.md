@@ -85,13 +85,16 @@ Dockerfile               # Multi-stage production build
 - `strava_tokens` — OAuth refresh/access token storage
 - `media` — YouTube URLs and Instagram post URLs linked to a ride
 
+### Locale
+The site is **Korean-only** (`ko`). All user-facing routes live under `/ko/...`. Middleware redirects `/` and `/en/*` to `/ko/...`. The root `<html lang>` is hardcoded to `ko`. There is no English dictionary — `lib/i18n/ko.ts` is the sole translation file.
+
 ### Pages
 | Route | Purpose |
 |---|---|
-| `/` | Cinematic hero, live global totals, interactive Leaflet world map |
-| `/rides` | Grid of all rides, filterable by country / type |
-| `/rides/[country]/[slug]` | Single ride: elevation chart, Mapbox/Leaflet route, YouTube embed, story, stats |
-| `/dashboard` | Cumulative stats, country breakdown, top climbs, yearly chart |
+| `/ko` | Cinematic hero, live global totals, interactive Leaflet world map |
+| `/ko/rides` | Grid of all rides, filterable by country / type |
+| `/ko/rides/[country]/[slug]` | Single ride: elevation chart, Mapbox/Leaflet route, YouTube embed, story, stats |
+| `/ko/dashboard` | Cumulative stats, country breakdown, top climbs, yearly chart |
 
 ### Map
 - **Leaflet.js** for the world map — countries fill/highlight based on rides ridden.

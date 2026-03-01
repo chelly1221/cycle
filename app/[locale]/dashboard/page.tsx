@@ -177,8 +177,8 @@ export default async function DashboardPage({
           <div className="space-y-2">
             {[
               { label: d.dashboard.centuries.c100, count: centuries.century100 },
-              { label: d.dashboard.centuries.c150, count: centuries.century150 },
               { label: d.dashboard.centuries.c200, count: centuries.century200 },
+              { label: d.dashboard.centuries.c300, count: centuries.century300 },
             ].map(({ label, count }) => (
               <div key={label} className="flex items-center justify-between">
                 <span className="text-sm text-gray-400">{label}</span>

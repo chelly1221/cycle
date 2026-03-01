@@ -78,8 +78,8 @@ const ko = {
     centuries: {
       title: '센추리 라이드',
       c100: '100km+',
-      c150: '150km+',
       c200: '200km+',
+      c300: '300km+',
     },
     heatmap: {
       title: '활동 히트맵',

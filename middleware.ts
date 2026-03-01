@@ -1,13 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
 
-const locales = ['en', 'ko']
-
-function getLocale(req: NextRequest): 'en' | 'ko' {
-  const al = req.headers.get('accept-language') ?? ''
-  const primary = al.split(',')[0].split(';')[0].trim().toLowerCase()
-  return primary.startsWith('ko') ? 'ko' : 'en'
-}
-
 export function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl
 
@@ -33,21 +25,26 @@ export function middleware(req: NextRequest) {
     return NextResponse.next()
   }
 
-  // Already has a locale prefix
-  const matchedLocale = locales.find(
-    (l) => pathname === `/${l}` || pathname.startsWith(`/${l}/`)
-  )
-  if (matchedLocale) {
+  // Already has /ko prefix
+  if (pathname === '/ko' || pathname.startsWith('/ko/')) {
     const res = NextResponse.next()
-    res.headers.set('x-locale', matchedLocale)
+    res.headers.set('x-locale', 'ko')
     return res
   }
 
-  // Redirect to locale-prefixed path
-  const locale = getLocale(req)
-  req.nextUrl.pathname = `/${locale}${pathname}`
+  // Redirect /en/* to /ko/*
+  if (pathname === '/en' || pathname.startsWith('/en/')) {
+    const rest = pathname.replace(/^\/en/, '')
+    req.nextUrl.pathname = `/ko${rest}`
+    const res = NextResponse.redirect(req.nextUrl)
+    res.headers.set('x-locale', 'ko')
+    return res
+  }
+
+  // Redirect bare paths to /ko/...
+  req.nextUrl.pathname = `/ko${pathname}`
   const res = NextResponse.redirect(req.nextUrl)
-  res.headers.set('x-locale', locale)
+  res.headers.set('x-locale', 'ko')
   return res
 }
 

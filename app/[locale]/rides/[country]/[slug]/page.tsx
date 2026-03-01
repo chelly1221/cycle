@@ -72,7 +72,7 @@ export default async function RidePage({ params }: { params: Params }) {
         <p className="text-strava text-xs font-mono uppercase tracking-widest mb-2">
           {ride.country} ·{' '}
           {new Date(ride.startedAt).toLocaleDateString(
-            params.locale === 'ko' ? 'ko-KR' : 'en-GB',
+            'ko-KR',
             { day: 'numeric', month: 'long', year: 'numeric' }
           )}
         </p>

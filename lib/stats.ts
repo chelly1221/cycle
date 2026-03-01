@@ -71,8 +71,8 @@ export interface AverageRideStats {
 
 export interface CenturyCounts {
   century100: number;
-  century150: number;
   century200: number;
+  century300: number;
 }
 
 export interface DailyRideCount {
@@ -300,13 +300,13 @@ export async function getAverageRideStats(): Promise<AverageRideStats> {
 }
 
 export async function getCenturyCounts(): Promise<CenturyCounts> {
-  const [c100, c150, c200] = await Promise.all([
+  const [c100, c200, c300] = await Promise.all([
     db.ride.count({ where: { distanceM: { gte: 100000 } } }),
-    db.ride.count({ where: { distanceM: { gte: 150000 } } }),
     db.ride.count({ where: { distanceM: { gte: 200000 } } }),
+    db.ride.count({ where: { distanceM: { gte: 300000 } } }),
   ]);
 
-  return { century100: c100, century150: c150, century200: c200 };
+  return { century100: c100, century200: c200, century300: c300 };
 }
 
 export async function getDailyRideCounts(days = 365): Promise<DailyRideCount[]> {
