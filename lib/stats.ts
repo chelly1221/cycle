@@ -318,7 +318,7 @@ export async function getDailyRideCounts(days = 365): Promise<DailyRideCount[]> 
       COUNT(*)::int AS rides,
       COALESCE(SUM(distance_m), 0) AS distance_m
     FROM rides
-    WHERE started_at >= NOW() - MAKE_INTERVAL(days => ${days})
+    WHERE started_at >= NOW() - MAKE_INTERVAL(days => ${days}::int)
     GROUP BY date
     ORDER BY date
   `;
