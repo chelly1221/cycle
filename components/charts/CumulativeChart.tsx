@@ -22,13 +22,32 @@ interface Props {
 
 const DEFAULT_LABELS = { distance: 'Cumulative Distance', unit: 'km' }
 
-function formatDate(dateStr: string): string {
-  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
-  const [y, m] = dateStr.split('-')
-  return `${months[parseInt(m, 10) - 1] ?? ''} ${y.slice(2)}`
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+
+function formatTooltipDate(dateStr: string): string {
+  const [y, m, day] = dateStr.split('-')
+  return `${MONTHS[parseInt(m, 10) - 1] ?? ''} ${parseInt(day, 10)}, ${y}`
 }
 
 export default function CumulativeChart({ data, labels = DEFAULT_LABELS }: Props) {
+  // Build a set of indices where the year changes — show full year there
+  const yearChangeIndices = new Set<number>()
+  yearChangeIndices.add(0)
+  for (let i = 1; i < data.length; i++) {
+    if (data[i].date.slice(0, 4) !== data[i - 1].date.slice(0, 4)) {
+      yearChangeIndices.add(i)
+    }
+  }
+
+  function formatTick(dateStr: string, index: number): string {
+    const [y, m] = dateStr.split('-')
+    const month = MONTHS[parseInt(m, 10) - 1] ?? ''
+    if (yearChangeIndices.has(index)) {
+      return `${month} '${y.slice(2)}`
+    }
+    return month
+  }
+
   return (
     <ResponsiveContainer width="100%" height={240}>
       <AreaChart data={data} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
@@ -41,11 +60,10 @@ export default function CumulativeChart({ data, labels = DEFAULT_LABELS }: Props
         <CartesianGrid strokeDasharray="3 3" stroke="#222" vertical={false} />
         <XAxis
           dataKey="date"
-          tickFormatter={formatDate}
+          tickFormatter={formatTick}
           tick={{ fill: '#666', fontSize: 11 }}
           axisLine={{ stroke: '#333' }}
           tickLine={false}
-          interval="preserveStartEnd"
         />
         <YAxis
           tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`}
@@ -63,7 +81,7 @@ export default function CumulativeChart({ data, labels = DEFAULT_LABELS }: Props
             fontSize: 13,
           }}
           formatter={(v: string | number) => [`${Number(v).toLocaleString()} ${labels.unit}`, labels.distance]}
-          labelFormatter={formatDate}
+          labelFormatter={formatTooltipDate}
           labelStyle={{ color: '#999', marginBottom: 2 }}
         />
         <Area
