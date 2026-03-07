@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { db } from "@/lib/db";
 import { getStravaCredentials } from "@/lib/strava";
+import { getExpectedToken } from "@/lib/auth";
 import crypto from "crypto";
 
 const STRAVA_API = "https://www.strava.com/api/v3";
@@ -9,8 +10,8 @@ const CALLBACK_URL = "https://cycle.3chan.kr/api/strava/webhook";
 
 function isAdmin(): boolean {
   const adminCookie = cookies().get("admin_auth")?.value;
-  const adminPw = process.env.ADMIN_PASSWORD;
-  return !!(adminPw && adminCookie === adminPw);
+  const expectedToken = getExpectedToken();
+  return !!(expectedToken && adminCookie === expectedToken);
 }
 
 // ─── GET: Check subscription status ────────────────────────────────────────

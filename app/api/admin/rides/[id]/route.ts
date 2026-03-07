@@ -1,17 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-
-function isAuthed(req: NextRequest): boolean {
-  const cookie = req.cookies.get("admin_auth")?.value;
-  const pass = process.env.ADMIN_PASSWORD;
-  return !!pass && cookie === pass;
-}
+import { isAuthedRequest } from "@/lib/auth";
 
 export async function PATCH(
   req: NextRequest,
   { params }: { params: { id: string } }
 ) {
-  if (!isAuthed(req)) {
+  if (!isAuthedRequest(req)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -39,7 +34,7 @@ export async function DELETE(
   req: NextRequest,
   { params }: { params: { id: string } }
 ) {
-  if (!isAuthed(req)) {
+  if (!isAuthedRequest(req)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

@@ -17,28 +17,40 @@ export default function RideMap({ polyline, className }: Props) {
     let mounted = true;
 
     (async () => {
-      const L = (await import("leaflet")).default;
+      try {
+        const L = (await import("leaflet")).default;
 
-      if (!mounted || !mapRef.current) return;
+        if (!mounted || !mapRef.current) return;
 
-      // polyline-encoded decode: returns [[lat, lng], ...]
-      const { decode } = await import("polyline-encoded");
-      const coords = decode(polyline) as [number, number][];
+        // polyline-encoded decode: returns [[lat, lng], ...]
+        const polylineUtil = (await import("polyline-encoded")) as any;
+        const decoder = polylineUtil.default || polylineUtil;
+        const coords = decoder.decode(polyline) as [number, number][];
 
-      mapInstance = L.map(mapRef.current, { zoomControl: true });
+        mapInstance = L.map(mapRef.current, {
+          zoomControl: false,
+          attributionControl: false,
+        });
 
-      L.tileLayer(
-        "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",
-        { attribution: "© OpenStreetMap contributors © CARTO" }
-      ).addTo(mapInstance);
+        L.control.attribution({ prefix: false })
+          .addAttribution('© <a href="https://www.openstreetmap.org/copyright">OSM</a> © <a href="https://carto.com/">CARTO</a>')
+          .addTo(mapInstance);
 
-      const route = L.polyline(coords, {
-        color: "#ff6b8a",
-        weight: 3,
-        opacity: 0.9,
-      }).addTo(mapInstance);
+        L.tileLayer(
+          "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",
+          { attribution: "" }
+        ).addTo(mapInstance);
 
-      mapInstance.fitBounds(route.getBounds(), { padding: [40, 40] });
+        const route = L.polyline(coords, {
+          color: "#ff6b8a",
+          weight: 3,
+          opacity: 0.9,
+        }).addTo(mapInstance);
+
+        mapInstance.fitBounds(route.getBounds(), { padding: [40, 40] });
+      } catch (err) {
+        console.error("[RideMap] Failed to initialize:", err);
+      }
     })();
 
     return () => {

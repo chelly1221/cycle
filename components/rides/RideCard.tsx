@@ -17,7 +17,6 @@ type RideCardProps = Pick<
 
 interface Props {
   ride: RideCardProps
-  locale?: string
   units?: { km: string; elev: string; moving: string; unknown: string }
 }
 
@@ -29,18 +28,18 @@ function formatDuration(seconds: number): string {
   return h > 0 ? `${h}h ${m}m` : `${m}m`
 }
 
-export default function RideCard({ ride, locale = 'en', units = DEFAULT_UNITS }: Props) {
+export default function RideCard({ ride, units = DEFAULT_UNITS }: Props) {
   const countrySlug = ride.country?.toLowerCase().replace(/\s+/g, '-') ?? 'unknown'
 
   return (
     <Link
-      href={`/${locale}/rides/${countrySlug}/${ride.slug}`}
+      href={`/rides/${countrySlug}/${ride.slug}`}
       className="group block bg-road-gray border border-gray-800 rounded-lg overflow-hidden hover:border-strava transition-colors"
     >
       <div className="p-5">
         <p className="text-xs text-gray-500 uppercase tracking-wider mb-1">
-          {getCountryName(ride.countryCode, locale, ride.country ?? units.unknown)} ·{' '}
-          {new Date(ride.startedAt).toLocaleDateString(locale === 'ko' ? 'ko-KR' : 'en-GB', {
+          {getCountryName(ride.countryCode, 'ko', ride.country ?? units.unknown)} ·{' '}
+          {new Date(ride.startedAt).toLocaleDateString('ko-KR', {
             day: 'numeric',
             month: 'short',
             year: 'numeric',

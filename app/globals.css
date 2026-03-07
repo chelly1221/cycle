@@ -5,6 +5,44 @@
 /* Leaflet map styles */
 @import "leaflet/dist/leaflet.css";
 
+/* TipTap rich editor styles */
+@import "../components/editor/editor-styles.css";
+
+.leaflet-control-attribution {
+  background: rgba(0, 0, 0, 0.5) !important;
+  color: transparent !important;
+  font-size: 0 !important;
+  width: 20px;
+  height: 20px;
+  border-radius: 50% !important;
+  padding: 0 !important;
+  display: flex !important;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  line-height: 1 !important;
+}
+.leaflet-control-attribution::before {
+  content: "\00A9";
+  font-size: 11px;
+  color: #666;
+}
+.leaflet-control-attribution:hover {
+  width: auto;
+  height: auto;
+  border-radius: 4px !important;
+  padding: 3px 8px !important;
+  font-size: 10px !important;
+  color: #888 !important;
+}
+.leaflet-control-attribution:hover::before {
+  display: none;
+}
+.leaflet-control-attribution a {
+  color: #999 !important;
+}
+
 :root {
   --background: #000000;
   --foreground: #ffffff;
@@ -13,6 +51,33 @@
 body {
   color: var(--foreground);
   background: var(--background);
+}
+
+/* ── Scrollbar ────────────────────────────────────────────────────────────── */
+
+/* Firefox */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.12) transparent;
+}
+
+/* Webkit (Chrome, Safari, Edge) */
+::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 2px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.25);
+}
+::-webkit-scrollbar-corner {
+  background: transparent;
 }
 
 @keyframes fadeInUp {

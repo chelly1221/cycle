@@ -1,99 +1,73 @@
-import dynamicImport from "next/dynamic";
-import { getGlobalStats, getCountryBreakdown } from "@/lib/stats";
+import dynamicImport from 'next/dynamic'
+import { getGlobalStats, getCountryBreakdown } from '@/lib/stats'
+import { RideType } from '@prisma/client'
+import { getDictionary } from '@/lib/i18n'
+import { db } from '@/lib/db'
+import polyline from 'polyline-encoded'
 
-export const dynamic = "force-dynamic";
+export const dynamic = 'force-dynamic'
 
-const WorldMap = dynamicImport(() => import("@/components/map/WorldMap"), {
+const GlobeScene = dynamicImport(() => import('@/components/three/GlobeScene'), {
   ssr: false,
   loading: () => (
-    <div className="w-full h-[500px] bg-gray-950 rounded-lg animate-pulse flex items-center justify-center text-gray-600">
-      Loading map...
+    <div className="w-full h-screen bg-black flex items-center justify-center">
+      <div className="w-64 h-64 rounded-full border border-gray-800 animate-pulse" />
     </div>
   ),
-});
+})
 
 export default async function HomePage() {
-  const [stats, countries] = await Promise.all([
-    getGlobalStats(),
-    getCountryBreakdown(),
-  ]);
+  const EXCLUDE = { excludeTypes: [RideType.VIRTUAL_RIDE, RideType.OTHER] }
+  const [stats, countries, d, ridesWithPolyline] = await Promise.all([
+    getGlobalStats(EXCLUDE),
+    getCountryBreakdown(EXCLUDE),
+    getDictionary(),
+    db.ride.findMany({
+      where: { polyline: { not: null }, type: { notIn: [RideType.VIRTUAL_RIDE, RideType.OTHER] } },
+      select: { polyline: true, name: true, distanceM: true, elevationM: true, movingTimeSec: true, startedAt: true, country: true, slug: true, elevationProfile: true },
+    }),
+  ])
+
+  // Decode polylines server-side → lightweight coordinate arrays + metadata for the client
+  const rideLines: { coords: [number, number][]; name: string; distanceKm: number; elevationM: number; movingTimeSec: number; startedAt: string; country: string | null; url: string; elevationProfile?: { distance: number; altitude: number }[] }[] = []
+  for (const r of ridesWithPolyline) {
+    if (!r.polyline) continue
+    try {
+      const coords = polyline.decode(r.polyline) as [number, number][]
+      if (coords.length >= 2) {
+        const countrySlug = r.country?.toLowerCase().replace(/\s+/g, '-') || 'unknown'
+        rideLines.push({
+          coords,
+          name: r.name,
+          distanceKm: Math.round(r.distanceM / 1000),
+          elevationM: Math.round(r.elevationM),
+          movingTimeSec: r.movingTimeSec,
+          startedAt: r.startedAt.toISOString(),
+          country: r.country,
+          url: `/rides/${countrySlug}/${r.slug}`,
+          elevationProfile: (r.elevationProfile as { distance: number; altitude: number }[] | null) ?? undefined,
+        })
+      }
+    } catch { /* skip malformed */ }
+  }
+
+  const statItems = [
+    { value: stats.totalDistanceKm.toLocaleString(), label: d.home.stats.km, unit: d.home.stats.units.km },
+    { value: stats.totalElevationM.toLocaleString(), label: d.home.stats.elevation, unit: d.home.stats.units.elevation },
+    { value: stats.totalMovingHours.toLocaleString(), label: d.home.stats.hours, unit: d.home.stats.units.hours },
+    { value: stats.totalRides.toLocaleString(), label: d.home.stats.rides, unit: d.home.stats.units.rides, hideMobile: true },
+    { value: String(stats.countriesVisited), label: d.home.stats.countries, unit: d.home.stats.units.countries, hideMobile: true },
+  ]
 
   return (
-    <>
-      {/* Hero */}
-      <section className="relative h-[90vh] flex items-center justify-center overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-black/20 to-black z-10" />
-        {/* Place hero video at public/hero.mp4 */}
-        <video
-          autoPlay
-          muted
-          loop
-          playsInline
-          className="absolute inset-0 w-full h-full object-cover opacity-60"
-          src="/hero.mp4"
-        />
-        <div className="relative z-20 text-center px-4">
-          <p className="text-strava font-mono text-xs tracking-[0.3em] uppercase mb-4">
-            Personal Cycling Archive
-          </p>
-          <h1 className="text-5xl md:text-7xl font-bold text-white leading-tight mb-6">
-            Documenting the world&apos;s
-            <br />
-            roads, one climb at a time.
-          </h1>
-          <p className="text-gray-400 text-lg max-w-md mx-auto">
-            {stats.totalRides} rides across {stats.countriesVisited} countries
-          </p>
-        </div>
-      </section>
-
-      {/* Live Stats Bar */}
-      <section className="bg-road-gray border-y border-gray-800">
-        <div className="max-w-5xl mx-auto px-4 py-10 grid grid-cols-2 md:grid-cols-5 gap-6 text-center">
-          {[
-            {
-              value: stats.totalDistanceKm.toLocaleString(),
-              label: "km ridden",
-            },
-            {
-              value: stats.totalElevationM.toLocaleString(),
-              label: "m climbed",
-            },
-            {
-              value: stats.totalMovingHours.toLocaleString(),
-              label: "hours moving",
-            },
-            { value: stats.totalRides.toLocaleString(), label: "rides" },
-            { value: stats.countriesVisited, label: "countries" },
-          ].map(({ value, label }) => (
-            <div key={label}>
-              <p className="text-4xl font-mono font-bold text-white">
-                {value}
-              </p>
-              <p className="text-xs text-gray-500 uppercase tracking-wider mt-1">
-                {label}
-              </p>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* World Map */}
-      <section className="max-w-6xl mx-auto px-4 py-16">
-        <h2 className="text-2xl font-bold text-white mb-6">Roads Ridden</h2>
-        <WorldMap visitedCountries={countries} />
-        {countries.length === 0 && (
-          <p className="text-gray-600 text-sm mt-4 text-center">
-            No rides synced yet. Run{" "}
-            <code className="bg-gray-900 px-1 rounded">npm run sync:strava</code> after
-            connecting Strava on{" "}
-            <a href="/dashboard" className="text-strava underline">
-              The Ledger
-            </a>
-            .
-          </p>
-        )}
-      </section>
-    </>
-  );
+    <GlobeScene
+      visitedCountries={countries}
+      rideLines={rideLines}
+      label={d.home.label}
+      tagline={d.home.tagline}
+      subtitle={`${stats.totalDistanceKm.toLocaleString()}km · ${stats.countriesVisited}개국`}
+      statItems={statItems}
+      tooltipLabels={{ rides: d.map.rides, km: d.map.km }}
+    />
+  )
 }

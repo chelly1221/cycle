@@ -2,6 +2,8 @@ const ko = {
   nav: {
     brand: '3chan의 자전거 여행',
     rides: '라이드',
+    videos: '영상',
+    photos: '사진',
     ledger: '기록부',
   },
   footer: 'Strava 데이터로 제작',
@@ -143,7 +145,18 @@ const ko = {
     },
   },
   map: { rides: '라이드', km: 'km' },
-  embeds: { viewOnInstagram: '인스타그램에서 보기', rideFilm: '라이드 영상' },
+  embeds: { viewOnInstagram: '인스타그램에서 보기', rideFilm: '라이드 영상', photos: '사진' },
+  videos: {
+    title: '라이드 영상',
+    count: '{n}개의 영상',
+    empty: '등록된 영상이 없습니다.',
+  },
+  photos: {
+    title: '라이드 사진',
+    count: '{n}장의 사진',
+    empty: '등록된 사진이 없습니다.',
+    viewRide: '라이드 보기',
+  },
   globe: {
     mediaPanel: {
       distance: '거리',

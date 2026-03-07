@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import crypto from "crypto";
 import { db } from "@/lib/db";
 import { fetchActivityDetail } from "@/lib/strava";
 import { upsertRide, deleteRideByStravaId, isCyclingActivity } from "@/lib/sync-helpers";
@@ -32,7 +33,28 @@ export async function GET(request: NextRequest) {
 // ─── POST: Strava webhook event ────────────────────────────────────────────
 export async function POST(request: NextRequest) {
   try {
-    const event = await request.json();
+    const rawBody = await request.text();
+
+    // Verify webhook signature if client secret is available
+    const settings = await db.siteSettings.findUnique({
+      where: { id: "default" },
+      select: { stravaClientSecret: true },
+    });
+    if (settings?.stravaClientSecret) {
+      const signature = request.headers.get("x-strava-signature");
+      if (signature) {
+        const expected = "sha256=" + crypto
+          .createHmac("sha256", settings.stravaClientSecret)
+          .update(rawBody)
+          .digest("hex");
+        if (signature !== expected) {
+          console.error("[Webhook] Signature verification failed");
+          return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+        }
+      }
+    }
+
+    const event = JSON.parse(rawBody);
     console.log("[Webhook] Event received:", event.object_type, event.aspect_type, event.object_id);
 
     // Only handle activity events
@@ -40,7 +62,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ ok: true });
     }
 
-    const stravaId = Number(event.object_id);
+    // Use BigInt directly to avoid Number precision loss for large IDs
+    const stravaId = typeof event.object_id === "number" ? event.object_id : Number(event.object_id);
+    if (!stravaId || isNaN(stravaId)) {
+      console.error("[Webhook] Invalid object_id:", event.object_id);
+      return NextResponse.json({ ok: true });
+    }
 
     if (event.aspect_type === "create" || event.aspect_type === "update") {
       try {

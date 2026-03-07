@@ -1,0 +1,255 @@
+/* ══════════════════════════════════════════════════════════════
+   TipTap Rich Editor + Story Display Styles
+   ══════════════════════════════════════════════════════════════ */
+
+/* ── Shared mixin via direct selectors ────────────────────────── */
+
+.rich-editor-content h2,
+.story-content h2 {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: #e5e7eb;
+  margin: 1.5rem 0 0.5rem;
+}
+
+.rich-editor-content h3,
+.story-content h3 {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #d1d5db;
+  margin: 1.25rem 0 0.5rem;
+}
+
+.rich-editor-content h4,
+.story-content h4 {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #d1d5db;
+  margin: 1rem 0 0.5rem;
+}
+
+.rich-editor-content p,
+.story-content p {
+  margin: 0.5rem 0;
+}
+
+.rich-editor-content ul,
+.story-content ul {
+  list-style: disc;
+  padding-left: 1.5rem;
+  margin: 0.5rem 0;
+}
+
+.rich-editor-content ol,
+.story-content ol {
+  list-style: decimal;
+  padding-left: 1.5rem;
+  margin: 0.5rem 0;
+}
+
+.rich-editor-content li,
+.story-content li {
+  margin: 0.25rem 0;
+}
+
+.rich-editor-content blockquote,
+.story-content blockquote {
+  border-left: 3px solid #4b5563;
+  padding-left: 1rem;
+  margin: 0.75rem 0;
+  color: #9ca3af;
+  font-style: italic;
+}
+
+.rich-editor-content pre,
+.story-content pre {
+  background: #111827;
+  border: 1px solid #374151;
+  border-radius: 0.5rem;
+  padding: 0.75rem 1rem;
+  margin: 0.75rem 0;
+  overflow-x: auto;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.8rem;
+  line-height: 1.6;
+}
+
+.rich-editor-content pre code,
+.story-content pre code {
+  background: none;
+  padding: 0;
+  border: none;
+  font-size: inherit;
+  color: #e5e7eb;
+}
+
+.rich-editor-content code,
+.story-content code {
+  background: #1f2937;
+  padding: 0.15rem 0.4rem;
+  border-radius: 0.25rem;
+  font-size: 0.85em;
+  color: #f9a8d4;
+}
+
+.rich-editor-content a,
+.story-content a {
+  color: #fc4c02;
+  text-decoration: underline;
+}
+
+.rich-editor-content a:hover,
+.story-content a:hover {
+  color: #ff6a33;
+}
+
+.rich-editor-content hr,
+.story-content hr {
+  border: none;
+  border-top: 1px solid #374151;
+  margin: 1.5rem 0;
+}
+
+.rich-editor-content img,
+.story-content img {
+  border-radius: 0.5rem;
+  max-width: 100%;
+  margin: 1rem 0;
+}
+
+/* ── Highlight mark ──────────────────────────────────────────── */
+
+.rich-editor-content mark,
+.story-content mark {
+  border-radius: 0.15em;
+  padding: 0.05em 0.15em;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+  color: #111827;
+}
+
+/* ── Columns layout ──────────────────────────────────────────── */
+
+.rich-editor-content div[data-type="columns"],
+.story-content div[data-type="columns"] {
+  display: grid;
+  gap: 1rem;
+  margin: 1rem 0;
+}
+
+.rich-editor-content div[data-type="columns"][data-layout="two-equal"],
+.story-content div[data-type="columns"][data-layout="two-equal"] {
+  grid-template-columns: 1fr 1fr;
+}
+
+.rich-editor-content div[data-type="columns"][data-layout="two-left"],
+.story-content div[data-type="columns"][data-layout="two-left"] {
+  grid-template-columns: 2fr 1fr;
+}
+
+.rich-editor-content div[data-type="columns"][data-layout="two-right"],
+.story-content div[data-type="columns"][data-layout="two-right"] {
+  grid-template-columns: 1fr 2fr;
+}
+
+/* Editor: show column boundaries */
+.rich-editor-content div[data-type="column"] {
+  border: 1px dashed #374151;
+  border-radius: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  min-height: 3rem;
+  min-width: 0;
+}
+
+/* Story: invisible columns */
+.story-content div[data-type="column"] {
+  min-width: 0;
+}
+
+/* Responsive: stack on small screens */
+@media (max-width: 640px) {
+  .rich-editor-content div[data-type="columns"],
+  .story-content div[data-type="columns"] {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+/* ── Callout blocks ──────────────────────────────────────────── */
+
+.rich-editor-content div[data-type="callout"],
+.story-content div[data-type="callout"] {
+  border-left: 4px solid;
+  border-radius: 0 0.5rem 0.5rem 0;
+  padding: 0.75rem 1rem;
+  margin: 0.75rem 0;
+  position: relative;
+}
+
+.rich-editor-content div[data-type="callout"]::before,
+.story-content div[data-type="callout"]::before {
+  display: block;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 0.4rem;
+  opacity: 0.9;
+}
+
+/* Info */
+.rich-editor-content div[data-type="callout"][data-variant="info"],
+.story-content div[data-type="callout"][data-variant="info"] {
+  border-left-color: #3b82f6;
+  background: rgba(59, 130, 246, 0.08);
+}
+.rich-editor-content div[data-type="callout"][data-variant="info"]::before,
+.story-content div[data-type="callout"][data-variant="info"]::before {
+  content: "INFO";
+  color: #60a5fa;
+}
+
+/* Warning */
+.rich-editor-content div[data-type="callout"][data-variant="warning"],
+.story-content div[data-type="callout"][data-variant="warning"] {
+  border-left-color: #f59e0b;
+  background: rgba(245, 158, 11, 0.08);
+}
+.rich-editor-content div[data-type="callout"][data-variant="warning"]::before,
+.story-content div[data-type="callout"][data-variant="warning"]::before {
+  content: "WARNING";
+  color: #fbbf24;
+}
+
+/* Tip */
+.rich-editor-content div[data-type="callout"][data-variant="tip"],
+.story-content div[data-type="callout"][data-variant="tip"] {
+  border-left-color: #22c55e;
+  background: rgba(34, 197, 94, 0.08);
+}
+.rich-editor-content div[data-type="callout"][data-variant="tip"]::before,
+.story-content div[data-type="callout"][data-variant="tip"]::before {
+  content: "TIP";
+  color: #4ade80;
+}
+
+/* Route */
+.rich-editor-content div[data-type="callout"][data-variant="route"],
+.story-content div[data-type="callout"][data-variant="route"] {
+  border-left-color: #fc4c02;
+  background: rgba(252, 76, 2, 0.08);
+}
+.rich-editor-content div[data-type="callout"][data-variant="route"]::before,
+.story-content div[data-type="callout"][data-variant="route"]::before {
+  content: "ROUTE";
+  color: #fc4c02;
+}
+
+/* ── Placeholder ─────────────────────────────────────────────── */
+
+.rich-editor-content p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  float: left;
+  color: #6b7280;
+  pointer-events: none;
+  height: 0;
+}

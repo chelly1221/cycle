@@ -1,6 +1,6 @@
 import "dotenv/config";
-import { fetchActivities } from "../lib/strava";
-import { upsertRide } from "../lib/sync-helpers";
+import { fetchActivities, fetchActivityStreams } from "../lib/strava";
+import { upsertRide, isCyclingActivity, syncPhotosForRide, buildElevationProfile, saveElevationProfile } from "../lib/sync-helpers";
 import { db } from "../lib/db";
 
 async function main() {
@@ -26,10 +26,29 @@ async function main() {
   let errors = 0;
 
   for (const activity of activities) {
+    if (!isCyclingActivity(activity)) continue;
     try {
-      await upsertRide(activity);
+      const rideId = await upsertRide(activity);
+
+      // Fetch elevation profile from Strava Streams API (if not already stored)
+      const existing = await db.ride.findUnique({ where: { id: rideId }, select: { elevationProfile: true } });
+      if (!existing?.elevationProfile) {
+        try {
+          const streams = await fetchActivityStreams(activity.id);
+          const profile = buildElevationProfile(streams);
+          if (profile) await saveElevationProfile(rideId, profile);
+        } catch (err) {
+          console.warn(`  [WARN] Elevation streams for ${activity.name}:`, err);
+        }
+      }
+
+      let photoMsg = "";
+      if (activity.total_photo_count && activity.total_photo_count > 0) {
+        const photoCount = await syncPhotosForRide(activity.id, rideId);
+        photoMsg = ` (${photoCount} photos)`;
+      }
       console.log(
-        `  [OK] ${activity.name} — ${(activity.distance / 1000).toFixed(1)} km`
+        `  [OK] ${activity.name} — ${(activity.distance / 1000).toFixed(1)} km${photoMsg}`
       );
       synced++;
     } catch (err) {

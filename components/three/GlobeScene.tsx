@@ -1,9 +1,8 @@
 'use client'
 
-import { useEffect, useRef, useState, useCallback } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import type { CountryBreakdown } from '@/lib/stats'
-import MediaPinPanel, { type MediaPin, type MediaPanelLabels } from './MediaPinPanel'
 
 const GLOBE_RADIUS = 1.0
 const MAX_PITCH = Math.PI / 2.2
@@ -95,51 +94,121 @@ function smoothstep(t: number): number {
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
+export interface RideLineData {
+  coords: [number, number][]
+  name: string
+  distanceKm: number
+  elevationM: number
+  movingTimeSec: number
+  startedAt: string   // ISO string
+  country: string | null
+  url: string
+  elevationProfile?: { distance: number; altitude: number }[]
+}
+
+function MiniElevationChart({ data }: { data: { distance: number; altitude: number }[] }) {
+  if (data.length < 2) return null
+  const W = 260, H = 56
+  const minAlt = Math.min(...data.map(d => d.altitude))
+  const maxAlt = Math.max(...data.map(d => d.altitude))
+  const maxDist = data[data.length - 1].distance
+  const altRange = maxAlt - minAlt || 1
+  const pts = data.map(d => [
+    (d.distance / maxDist) * W,
+    H - ((d.altitude - minAlt) / altRange) * (H - 4),
+  ] as [number, number])
+  const linePts = pts.map(([x, y]) => `${x},${y}`).join(' ')
+  const area = `M0,${H} ${pts.map(([x, y]) => `L${x},${y}`).join(' ')} L${W},${H} Z`
+  return (
+    <div className="px-4 py-3 border-b border-white/10 flex-shrink-0">
+      <div className="flex justify-between text-[9px] text-gray-600 mb-1 font-mono">
+        <span>{Math.round(minAlt)}m</span>
+        <span>{Math.round(maxAlt)}m</span>
+      </div>
+      <svg width="100%" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" className="block h-[56px]">
+        <defs>
+          <linearGradient id="sElevGrad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#fc5200" stopOpacity={0.4} />
+            <stop offset="100%" stopColor="#fc5200" stopOpacity={0.02} />
+          </linearGradient>
+        </defs>
+        <path d={area} fill="url(#sElevGrad)" />
+        <polyline points={linePts} fill="none" stroke="#fc5200" strokeWidth="1.5" strokeLinejoin="round" />
+      </svg>
+    </div>
+  )
+}
+
+function fmtTime(s: number) {
+  const h = Math.floor(s / 3600)
+  const m = Math.floor((s % 3600) / 60)
+  return h > 0 ? `${h}h ${m}m` : `${m}m`
+}
+
+function fmtDate(iso: string) {
+  const [y, mo, d] = iso.split('T')[0].split('-')
+  return `${y}년 ${Number(mo)}월 ${Number(d)}일`
+}
+
 interface Props {
   visitedCountries: CountryBreakdown[]
-  rideLines?: [number, number][][]
-  mediaPins?: MediaPin[]
-  mediaPanelLabels?: MediaPanelLabels
+  rideLines?: RideLineData[]
   label: string
   tagline: string
   subtitle: string
   statItems: { value: string; label: string; unit?: string; hideMobile?: boolean }[]
-  locale: string
   tooltipLabels: { rides: string; km: string }
 }
 
 export default function GlobeScene({
   visitedCountries,
   rideLines,
-  mediaPins,
-  mediaPanelLabels,
   label,
   tagline,
   subtitle,
   statItems,
-  locale,
   tooltipLabels,
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null)
   const tooltipRef   = useRef<HTMLDivElement>(null)
+  const textOverlayRef = useRef<HTMLDivElement>(null)
+  const sidebarRef   = useRef<HTMLDivElement>(null)
 
-  const [selectedPin, setSelectedPin] = useState<MediaPin | null>(null)
-  const selectedPinRef = useRef<MediaPin | null>(null)
-
-  const handlePanelClose = useCallback(() => {
-    setSelectedPin(null)
-    selectedPinRef.current = null
+  // Block wheel events from bubbling out of the sidebar to the globe
+  useEffect(() => {
+    const el = sidebarRef.current
+    if (!el) return
+    const stop = (e: WheelEvent) => e.stopPropagation()
+    el.addEventListener('wheel', stop)
+    return () => el.removeEventListener('wheel', stop)
   }, [])
 
   const router    = useRouter()
   const routerRef = useRef(router)
   routerRef.current = router
 
+  const [selectedRide, setSelectedRide] = useState<RideLineData | null>(null)
+  const setSelectedRideRef = useRef(setSelectedRide)
+  setSelectedRideRef.current = setSelectedRide
+
+  // Called by the close button to reset the selected line's glow from React side
+  const clearSelectedLineRef = useRef<() => void>(() => {})
+
+  // Media fetched on demand when a ride is selected
+  type MediaItem = { id: string; type: string; url: string; title: string | null; thumbnailUrl: string | null }
+  const [sidebarMedia, setSidebarMedia] = useState<MediaItem[]>([])
+  useEffect(() => {
+    if (!selectedRide) { setSidebarMedia([]); return }
+    const slug = selectedRide.url.split('/').pop()
+    fetch(`/api/rides/${slug}/media`)
+      .then(r => r.json())
+      .then(d => setSidebarMedia(d.media ?? []))
+      .catch(() => setSidebarMedia([]))
+  }, [selectedRide])
+
   // Keep latest prop values accessible inside the effect closure without
   // re-running the entire Three.js setup on prop changes.
-  const localeRef        = useRef(locale)
   const tooltipLabelsRef = useRef(tooltipLabels)
-  localeRef.current        = locale
   tooltipLabelsRef.current = tooltipLabels
 
   useEffect(() => {
@@ -159,16 +228,25 @@ export default function GlobeScene({
     let lastY       = 0
     let velX        = 0
     let velY        = 0
-    let rotX        = 0     // pitch — locked upright (north always on top)
-    let rotY        = 0     // yaw
-    let targetZ     = 4.5
-    let currentZ    = 4.5
     let hoveredCode: string | null = null
-    let hoveredPin: MediaPin | null = null
+
+    // ── Intro skip: if already visited today, go straight to interactive mode ─
+    const today = new Date().toISOString().split('T')[0]
+    let seenToday = false
+    try { seenToday = localStorage.getItem('globe_intro_date') === today } catch {}
+
+    // On page reload (Ctrl+R / Ctrl+Shift+R), always replay the intro
+    const navEntry = performance.getEntriesByType('navigation')[0] as PerformanceNavigationTiming | undefined
+    if (navEntry?.type === 'reload') seenToday = false
+
+    let rotX    = seenToday ? KOREA_TARGET_ROT_X : 0
+    let rotY    = seenToday ? KOREA_TARGET_ROT_Y : 0
+    let targetZ = seenToday ? KOREA_TARGET_Z : 4.5
+    let currentZ= seenToday ? KOREA_TARGET_Z : 4.5
 
     // ── Intro state ──────────────────────────────────────────────────────────
-    // Phases: text → orient (rotate to Korea + zoom) → tour (auto country cycle) → done
-    let introPhase: 'text' | 'orient' | 'tour' | 'done' = 'text'
+    // Phases: text → orient (rotate to Korea + zoom) → done
+    let introPhase: 'text' | 'orient' | 'done' = seenToday ? 'done' : 'text'
     let orientStartRotY = 0
     let orientStartRotX = 0
     const introStart = performance.now()
@@ -200,8 +278,14 @@ export default function GlobeScene({
       renderer.toneMappingExposure = 1.0
       container.appendChild(renderer.domElement)
       const canvas = renderer.domElement
-      canvas.style.cursor = 'default'
+      canvas.style.cursor = seenToday ? 'grab' : 'default'
       canvas.style.touchAction = 'none'  // prevent pull-to-refresh on mobile
+
+      // Skip intro animation — hide text overlay immediately
+      if (seenToday) {
+        const el = textOverlayRef.current
+        if (el) el.style.opacity = '0'
+      }
 
       // ── Scene / Camera ─────────────────────────────────────────────────────
       const scene  = new THREE.Scene()
@@ -551,123 +635,52 @@ export default function GlobeScene({
         // GeoJSON unavailable — globe renders without borders
       }
 
-      // ── Ride polylines ────────────────────────────────────────────────────
+      // ── Ride polylines (individual lines for hover interaction) ──────────
+      type RideLineRef = { mat: InstanceType<typeof THREE.LineBasicMaterial>; data: RideLineData }
+      const rideLineMap = new Map<object, RideLineRef>()
+      const rideLineObjects: object[] = []
+      let hoveredRideRef: RideLineRef | null = null
+      let selectedLineRef: RideLineRef | null = null
+
+      // Reset a line to its resting color (orange if selected, pink if not)
+      const resetLineColor = (ref: RideLineRef) => {
+        if (ref === selectedLineRef) {
+          ref.mat.color.setHex(0xffffff) // white glow — same as hover, persists
+          ref.mat.opacity = 1.0
+        } else {
+          ref.mat.color.setHex(0xff6b8a)
+          ref.mat.opacity = 0.55
+        }
+      }
+
+      // Expose deselect logic so the React close button can reset the glow
+      clearSelectedLineRef.current = () => {
+        if (selectedLineRef) {
+          selectedLineRef.mat.color.setHex(0xff6b8a)
+          selectedLineRef.mat.opacity = 0.55
+          selectedLineRef = null
+        }
+      }
+
       if (rideLines && rideLines.length > 0) {
         const R_RIDE = GLOBE_RADIUS + 0.002
-        const rideMat = new THREE.LineBasicMaterial({
-          color: 0xff6b8a,
-          opacity: 0.6,
-          transparent: true,
-        })
 
-        for (const coords of rideLines) {
-          const points = coords.map(([lat, lng]) => {
+        for (const ride of rideLines) {
+          const mat = new THREE.LineBasicMaterial({
+            color: 0xff6b8a,
+            opacity: 0.55,
+            transparent: true,
+          })
+          const points = ride.coords.map(([lat, lng]) => {
             const { x, y, z } = latLngToXYZ(lat, lng, R_RIDE)
             return new THREE.Vector3(x, y, z)
           })
           const geo = new THREE.BufferGeometry().setFromPoints(points)
-          globeMesh.add(new THREE.Line(geo, rideMat))
+          const line = new THREE.Line(geo, mat)
+          globeMesh.add(line)
+          rideLineMap.set(line, { mat, data: ride })
+          rideLineObjects.push(line)
         }
-      }
-
-      // ── Media Pin Markers (4-point star sprite) ────────────────────────────
-      const markerStars: any[] = []     // THREE.Sprite[]
-      const markerHitMeshes: any[] = []
-      let markerFadeProgress = 0
-      const STAR_SIZE = 0.018
-
-      if (mediaPins && mediaPins.length > 0) {
-        // Draw 4-point star on canvas
-        const starCanvas = document.createElement('canvas')
-        starCanvas.width = 64
-        starCanvas.height = 64
-        const ctx = starCanvas.getContext('2d')!
-        ctx.clearRect(0, 0, 64, 64)
-        ctx.fillStyle = '#ff6b8a'
-        ctx.beginPath()
-        const cx = 32, cy = 32, outer = 28, inner = 6
-        for (let p = 0; p < 4; p++) {
-          const angle = (p * Math.PI) / 2 - Math.PI / 2
-          const midAngle = angle + Math.PI / 4
-          ctx.lineTo(cx + Math.cos(angle) * outer, cy + Math.sin(angle) * outer)
-          ctx.lineTo(cx + Math.cos(midAngle) * inner, cy + Math.sin(midAngle) * inner)
-        }
-        ctx.closePath()
-        ctx.fill()
-        const starTexture = new THREE.CanvasTexture(starCanvas)
-
-        for (let i = 0; i < mediaPins.length; i++) {
-          const pin = mediaPins[i]
-          const pos = latLngToXYZ(pin.lat, pin.lng, GLOBE_RADIUS + 0.003)
-
-          const mat = new THREE.SpriteMaterial({
-            map: starTexture,
-            transparent: true,
-            opacity: 0,
-            depthTest: false,
-            sizeAttenuation: false,
-          })
-          const sprite = new THREE.Sprite(mat)
-          sprite.position.set(pos.x, pos.y, pos.z)
-          sprite.scale.set(STAR_SIZE, STAR_SIZE, 1)
-          sprite.userData.pinIndex = i
-          globeMesh.add(sprite)
-          markerStars.push(sprite)
-
-          // Invisible hit sphere for raycasting
-          const hitGeo = new THREE.SphereGeometry(0.02, 6, 6)
-          const hitMat = new THREE.MeshBasicMaterial({ visible: false })
-          const hitMesh = new THREE.Mesh(hitGeo, hitMat)
-          hitMesh.position.set(pos.x, pos.y, pos.z)
-          hitMesh.userData.mediaPin = pin
-          hitMesh.userData.pinIndex = i
-          globeMesh.add(hitMesh)
-          markerHitMeshes.push(hitMesh)
-        }
-      }
-
-      // ── Tour stops: group mediaPins by country, pick representative pin ───
-      type TourStop = { pin: MediaPin; targetRotY: number; targetRotX: number }
-      const tourStops: TourStop[] = []
-
-      if (mediaPins && mediaPins.length > 0) {
-        const byCountry = new Map<string, MediaPin>()
-        for (const pin of mediaPins) {
-          const cc = pin.countryCode || 'unknown'
-          if (!byCountry.has(cc)) byCountry.set(cc, pin)
-        }
-        for (const pin of Array.from(byCountry.values())) {
-          const phi = (90 - pin.lat) * Math.PI / 180
-          const theta = (pin.lng + 180) * Math.PI / 180
-          const px = -Math.sin(phi) * Math.cos(theta)
-          const py = Math.cos(phi)
-          const pz = Math.sin(phi) * Math.sin(theta)
-          tourStops.push({
-            pin,
-            targetRotY: Math.atan2(-px, pz),
-            targetRotX: Math.atan2(py, Math.sqrt(px * px + pz * pz)),
-          })
-        }
-      }
-
-      // ── Tour state (closure vars) ──────────────────────────────────────────
-      let tourIndex = 0
-      let tourPhase: 'move' | 'show' = 'move'
-      let tourRotStartY = 0
-      let tourRotStartX = 0
-      let tourRotDeltaY = 0          // shortest-path delta for rotY
-      let tourRotDeltaX = 0          // delta for rotX
-      let tourPhaseStart = 0
-      const TOUR_MOVE_SEC = 1.8      // rotation + zoom breathe combined
-      const TOUR_SHOW_SEC = 4.0
-      const TOUR_ZOOM_IN = 1.2       // close-up when showing panel
-      const TOUR_ZOOM_BUMP = 0.5     // how much to zoom out at midpoint
-
-      /** Normalize angle delta to [-π, π] for shortest rotation */
-      function shortestDelta(from: number, to: number): number {
-        let d = to - from
-        d -= Math.round(d / (2 * Math.PI)) * 2 * Math.PI
-        return d
       }
 
       // ── Bloom post-processing ──────────────────────────────────────────────
@@ -685,6 +698,7 @@ export default function GlobeScene({
 
       // ── Helper: update tooltip DOM directly (no React re-render) ─────────
       const tt = tooltipRef.current
+      const esc = (s: string) => s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')
       const showTooltip = (cx: number, cy: number, html: string) => {
         if (!tt) return
         const rect = canvas.getBoundingClientRect()
@@ -695,21 +709,23 @@ export default function GlobeScene({
       }
       const hideTooltip = () => { if (tt) tt.style.display = 'none' }
 
-      // ── Tour cancel helper ──────────────────────────────────────────────────
-      const cancelTour = () => {
-        introPhase = 'done'
-        setSelectedPin(null)
-        selectedPinRef.current = null
-        targetZ = currentZ
-        canvas.style.cursor = 'grab'
+      // ── Fade out text overlay on first interaction ────────────────────────
+      let textHidden = false
+      const fadeOutText = () => {
+        if (textHidden) return
+        textHidden = true
+        const el = textOverlayRef.current
+        if (el) {
+          el.style.transition = 'opacity 0.6s ease'
+          el.style.opacity = '0'
+        }
       }
 
       // ── Event handlers ─────────────────────────────────────────────────────
 
       const onPointerDown = (e: PointerEvent) => {
-        if (introPhase === 'tour') { cancelTour(); return }
         if (introPhase !== 'done') return
-        if (selectedPinRef.current) return // panel open, suppress drag
+        fadeOutText()
         isDragging = true
         lastX = e.clientX
         lastY = e.clientY
@@ -718,12 +734,19 @@ export default function GlobeScene({
         canvas.setPointerCapture(e.pointerId)
         canvas.style.cursor = 'grabbing'
         hideTooltip()
+        // hoveredRideRef is reset on actual drag movement, not here,
+        // so that onClick can still read it for a plain click.
       }
 
       const onPointerMove = (e: PointerEvent) => {
         if (introPhase !== 'done') return
 
         if (isDragging) {
+          // Clear ride hover as soon as the pointer actually moves (real drag)
+          if (hoveredRideRef) {
+            resetLineColor(hoveredRideRef)
+            hoveredRideRef = null
+          }
           const dx = e.clientX - lastX
           const dy = e.clientY - lastY
           // Scale sensitivity with zoom level — cubic curve keeps zoom-in
@@ -740,33 +763,74 @@ export default function GlobeScene({
           return
         }
 
-        // ── Hover: check media pin markers first, then globe → country ─────
+        // ── Hover: ride lines → country ──────────────────────────────────────
         const rect = canvas.getBoundingClientRect()
         mouse.x = ((e.clientX - rect.left) / rect.width)  * 2 - 1
         mouse.y = -((e.clientY - rect.top)  / rect.height) * 2 + 1
         raycaster.setFromCamera(mouse, camera)
 
-        // Check media pin hit meshes first
-        if (markerHitMeshes.length > 0) {
-          const pinHits = raycaster.intersectObjects(markerHitMeshes, false)
-          if (pinHits.length > 0) {
-            const pin = pinHits[0].object.userData.mediaPin as MediaPin
-            hoveredPin = pin
-            hoveredCode = null
-            canvas.style.cursor = 'pointer'
-            showTooltip(
-              e.clientX, e.clientY,
-              `<strong>${pin.rideName}</strong><br/><span style="color:#ff6b8a">&#9654; Media</span>`,
-            )
-            return
-          }
-        }
-        hoveredPin = null
-
         const hitPt = new THREE.Vector3()
         const hit   = raycaster.ray.intersectSphere(globeSphere, hitPt)
 
         if (hit) {
+          // ── Check ride polylines via screen-space proximity ───────────────
+          // 3D raycasting against Line objects is unreliable (back-face hits,
+          // matrixWorld timing). Instead, project line vertices to screen space
+          // and find the closest one to the cursor.
+          if (rideLineObjects.length > 0) {
+            const mx = e.clientX - rect.left
+            const my = e.clientY - rect.top
+            const THRESHOLD_SQ = 64 // 8px radius
+            let closestRef: RideLineRef | null = null
+            let closestDistSq = THRESHOLD_SQ
+
+            for (const [lineObj, ref] of Array.from(rideLineMap.entries())) {
+              const positions = (lineObj as any).geometry.attributes.position
+              const count: number = positions.count
+              const step = Math.max(1, Math.floor(count / 24))
+              const mw = (lineObj as any).matrixWorld
+
+              for (let i = 0; i < count; i += step) {
+                const wp = new THREE.Vector3(
+                  positions.getX(i), positions.getY(i), positions.getZ(i),
+                ).applyMatrix4(mw)
+
+                if (wp.z <= 0) continue // back side of globe — skip
+
+                const ndc = wp.project(camera)
+                const sx = (ndc.x + 1) / 2 * rect.width
+                const sy = (1 - ndc.y) / 2 * rect.height
+                const dx = sx - mx
+                const dy = sy - my
+                const dSq = dx * dx + dy * dy
+                if (dSq < closestDistSq) { closestDistSq = dSq; closestRef = ref }
+              }
+            }
+
+            if (closestRef) {
+              if (hoveredRideRef && hoveredRideRef !== closestRef) {
+                resetLineColor(hoveredRideRef)
+              }
+              closestRef.mat.color.setHex(0xffffff)
+              closestRef.mat.opacity = 1.0
+              hoveredRideRef = closestRef
+              hoveredCode = null
+              canvas.style.cursor = 'pointer'
+              showTooltip(
+                e.clientX, e.clientY,
+                `<strong>${esc(closestRef.data.name)}</strong><br/><span style="color:#9ca3af">${closestRef.data.distanceKm.toLocaleString()}km · ${closestRef.data.elevationM.toLocaleString()}m</span>`,
+              )
+              return
+            }
+          }
+
+          // Reset ride hover when not on a line
+          if (hoveredRideRef) {
+            resetLineColor(hoveredRideRef)
+            hoveredRideRef = null
+          }
+
+          // ── Country hover (fallback) ─────────────────────────────────────
           const local = globeMesh.worldToLocal(hitPt.clone())
           const { lat, lng } = xyzToLatLng(local.x, local.y, local.z)
           const found = hitTestCountry(lng, lat, geojsonFeatures)
@@ -781,10 +845,10 @@ export default function GlobeScene({
             if (data) {
               showTooltip(
                 e.clientX, e.clientY,
-                `<strong>${found.name}</strong><br/><span style="color:#9ca3af">${data.rides} ${labels.rides} · ${data.distanceKm.toLocaleString()} ${labels.km}</span>`,
+                `<strong>${esc(found.name)}</strong><br/><span style="color:#9ca3af">${data.rides} ${labels.rides} · ${data.distanceKm.toLocaleString()} ${labels.km}</span>`,
               )
             } else {
-              showTooltip(e.clientX, e.clientY, `<strong>${found.name}</strong>`)
+              showTooltip(e.clientX, e.clientY, `<strong>${esc(found.name)}</strong>`)
             }
           } else {
             hoveredCode = null
@@ -792,6 +856,10 @@ export default function GlobeScene({
             hideTooltip()
           }
         } else {
+          if (hoveredRideRef) {
+            resetLineColor(hoveredRideRef)
+            hoveredRideRef = null
+          }
           hoveredCode = null
           canvas.style.cursor = 'grab'
           hideTooltip()
@@ -805,24 +873,29 @@ export default function GlobeScene({
       }
 
       const onClick = () => {
-        if (introPhase === 'tour') { cancelTour(); return }
         if (introPhase !== 'done') return
-        if (selectedPinRef.current) return // panel open, ignore globe clicks
-        if (hoveredPin) {
-          selectedPinRef.current = hoveredPin
-          setSelectedPin(hoveredPin)
-          hideTooltip()
+        if (hoveredRideRef) {
+          // Reset previous selection
+          if (selectedLineRef && selectedLineRef !== hoveredRideRef) {
+            selectedLineRef.mat.color.setHex(0xff6b8a)
+            selectedLineRef.mat.opacity = 0.55
+          }
+          // Apply selected glow (white, same as hover) and persist it
+          hoveredRideRef.mat.color.setHex(0xffffff)
+          hoveredRideRef.mat.opacity = 1.0
+          selectedLineRef = hoveredRideRef
+          setSelectedRideRef.current(hoveredRideRef.data)
           return
         }
         if (hoveredCode && visitedCodes.has(hoveredCode)) {
-          routerRef.current.push(`/${localeRef.current}/rides`)
+          routerRef.current.push('/rides')
         }
       }
 
       const onWheel = (e: WheelEvent) => {
         e.preventDefault()
-        if (introPhase === 'tour') cancelTour()
         if (introPhase !== 'done') return
+        fadeOutText()
         targetZ = Math.max(1.2, Math.min(4.5, targetZ + e.deltaY * 0.003))
       }
 
@@ -852,7 +925,7 @@ export default function GlobeScene({
         const dt = spaceT - lastRenderTime
         lastRenderTime = spaceT
         starUniforms.uTime.value = spaceT
-        if (introPhase === 'done' || introPhase === 'tour') tickShootingStars(dt, spaceT)
+        if (introPhase === 'done') tickShootingStars(dt, spaceT)
 
         const elapsed = (performance.now() - introStart) / 1000
 
@@ -877,65 +950,10 @@ export default function GlobeScene({
 
           if (t >= 1) {
             currentZ = KOREA_TARGET_Z
-            if (tourStops.length > 0) {
-              introPhase = 'tour'
-              tourIndex = 0
-              tourPhase = 'move'
-              tourRotStartY = rotY
-              tourRotStartX = rotX
-              tourRotDeltaY = shortestDelta(rotY, tourStops[0].targetRotY)
-              tourRotDeltaX = shortestDelta(rotX, tourStops[0].targetRotX)
-              tourPhaseStart = performance.now()
-            } else {
-              introPhase = 'done'
-              targetZ = KOREA_TARGET_Z
-              canvas.style.cursor = 'grab'
-            }
-          }
-        } else if (introPhase === 'tour') {
-          // ── Auto country tour: move (rotate+zoom) → show ──────────────
-          const now = performance.now()
-          const phaseElapsed = (now - tourPhaseStart) / 1000
-          const stop = tourStops[tourIndex]
-
-          if (tourPhase === 'move') {
-            // Rotation + zoom breathe happen simultaneously
-            const t = Math.min(phaseElapsed / TOUR_MOVE_SEC, 1)
-            const ease = smoothstep(t)
-
-            // Rotate via shortest path
-            rotY = tourRotStartY + tourRotDeltaY * ease
-            rotX = tourRotStartX + tourRotDeltaX * ease
-
-            // Zoom: breathe out at midpoint, back to ZOOM_IN at end
-            // sin(π*t) peaks at 0.5 → gentle bump outward during move
-            const breathe = Math.sin(Math.PI * t)
-            currentZ = TOUR_ZOOM_IN + TOUR_ZOOM_BUMP * breathe
-            camera.position.z = currentZ
-
-            if (t >= 1) {
-              tourPhase = 'show'
-              currentZ = TOUR_ZOOM_IN
-              camera.position.z = currentZ
-              tourPhaseStart = now
-              selectedPinRef.current = stop.pin
-              setSelectedPin(stop.pin)
-            }
-          } else {
-            // tourPhase === 'show' — display panel at close-up
-            camera.position.z = currentZ
-            if (phaseElapsed >= TOUR_SHOW_SEC) {
-              setSelectedPin(null)
-              selectedPinRef.current = null
-              tourIndex = (tourIndex + 1) % tourStops.length
-              const next = tourStops[tourIndex]
-              tourPhase = 'move'
-              tourRotStartY = rotY
-              tourRotStartX = rotX
-              tourRotDeltaY = shortestDelta(rotY, next.targetRotY)
-              tourRotDeltaX = shortestDelta(rotX, next.targetRotX)
-              tourPhaseStart = now
-            }
+            introPhase = 'done'
+            targetZ = KOREA_TARGET_Z
+            canvas.style.cursor = 'grab'
+            try { localStorage.setItem('globe_intro_date', today) } catch {}
           }
         } else {
           // ── Interactive mode — drag inertia, axis stays vertical ──────────
@@ -949,25 +967,6 @@ export default function GlobeScene({
           // Smooth zoom
           currentZ += (targetZ - currentZ) * 0.1
           camera.position.z = currentZ
-        }
-
-        // ── Media pin marker animation (4-point stars) ────────────────────
-        if (markerStars.length > 0 && (introPhase === 'done' || introPhase === 'tour')) {
-          markerFadeProgress = Math.min(1, markerFadeProgress + dt * 1.25)
-          const fadeIn = smoothstep(markerFadeProgress)
-          for (let i = 0; i < markerStars.length; i++) {
-            const star = markerStars[i]
-            const phase = i * 0.5
-            // Twinkle: opacity oscillates between 0.3 and 0.8
-            const twinkle = 0.55 + 0.25 * Math.sin(spaceT * 2.2 + phase)
-            star.material.opacity = fadeIn * twinkle
-            // Slow rotation
-            star.material.rotation = spaceT * 0.5 + phase
-            // Gentle scale pulse
-            const pulse = 1 + 0.2 * Math.sin(spaceT * 1.5 + phase * 1.3)
-            const s = STAR_SIZE * pulse
-            star.scale.set(s, s, 1)
-          }
         }
 
         globeMesh.rotation.copy(new THREE.Euler(rotX, rotY, 0, 'XYZ'))
@@ -990,14 +989,6 @@ export default function GlobeScene({
           ss.line.geometry.dispose()
           ;(ss.line.material as any).dispose()
         })
-        markerStars.forEach(s => {
-          s.material.map?.dispose()
-          s.material.dispose()
-        })
-        markerHitMeshes.forEach(m => {
-          m.geometry.dispose()
-          m.material.dispose()
-        })
         composer.dispose()
         renderer.dispose()
         if (renderer.domElement.parentNode === container) {
@@ -1012,20 +1003,10 @@ export default function GlobeScene({
       cleanupFn?.()
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [visitedCountries, rideLines, mediaPins])
+  }, [visitedCountries, rideLines])
 
   return (
     <div ref={containerRef} className="relative w-full h-[calc(100dvh-4rem)] bg-black overflow-hidden">
-
-      {/* Media pin panel overlay */}
-      {selectedPin && mediaPanelLabels && (
-        <MediaPinPanel
-          pin={selectedPin}
-          onClose={handlePanelClose}
-          locale={locale}
-          labels={mediaPanelLabels}
-        />
-      )}
 
       {/* Country tooltip — updated via direct DOM manipulation */}
       <div
@@ -1037,7 +1018,7 @@ export default function GlobeScene({
       />
 
       {/* Text overlay — cinematic fade-in sequence */}
-      <div className="absolute inset-0 z-10 flex flex-col items-center justify-center pointer-events-none px-4 md:pb-24">
+      <div ref={textOverlayRef} className="absolute inset-0 z-10 flex flex-col items-center justify-center pointer-events-none px-4 md:pb-24">
         <p
           className="text-strava font-mono text-[10px] md:text-xs tracking-[0.3em] uppercase mb-3 md:mb-4"
           style={{ opacity: 0, animation: 'fadeInUp 0.8s ease forwards', animationDelay: '0.8s' }}
@@ -1075,6 +1056,121 @@ export default function GlobeScene({
             </div>
           ))}
         </div>
+      </div>
+
+      {/* ── Ride detail sidebar ──────────────────────────────────────────────── */}
+      <div
+        ref={sidebarRef}
+        className={`absolute right-0 top-0 h-full z-20 flex flex-col
+                    w-72 sm:w-80
+                    bg-black/90 backdrop-blur-md border-l border-white/10
+                    transition-transform duration-300 ease-out
+                    ${selectedRide ? 'translate-x-0' : 'translate-x-full'}`}
+      >
+        {selectedRide && (
+          <>
+            {/* Header */}
+            <div className="flex items-start gap-3 p-5 pt-6 border-b border-white/10 flex-shrink-0">
+              <div className="flex-1 min-w-0">
+                {selectedRide.country && (
+                  <p className="text-[10px] font-mono text-strava tracking-[0.2em] uppercase mb-1">
+                    {selectedRide.country}
+                  </p>
+                )}
+                <h2 className="text-white font-bold text-sm leading-snug">
+                  {selectedRide.name}
+                </h2>
+                <p className="text-gray-500 text-xs mt-1">
+                  {fmtDate(selectedRide.startedAt)}
+                </p>
+              </div>
+              <button
+                onClick={() => { clearSelectedLineRef.current(); setSelectedRide(null) }}
+                className="flex-shrink-0 text-gray-500 hover:text-white text-xl leading-none mt-0.5 transition-colors"
+                aria-label="닫기"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Stats grid */}
+            <div className="grid grid-cols-3 divide-x divide-white/10 border-b border-white/10 flex-shrink-0">
+              {[
+                { value: selectedRide.distanceKm.toLocaleString(), unit: 'km' },
+                { value: selectedRide.elevationM.toLocaleString(), unit: 'm 고도' },
+                { value: fmtTime(selectedRide.movingTimeSec), unit: '이동' },
+              ].map(({ value, unit }) => (
+                <div key={unit} className="py-4 text-center">
+                  <p className="text-lg font-mono font-bold text-white">{value}</p>
+                  <p className="text-[10px] text-gray-500 uppercase tracking-wider mt-0.5">{unit}</p>
+                </div>
+              ))}
+            </div>
+
+            {/* Elevation profile */}
+            {selectedRide.elevationProfile && selectedRide.elevationProfile.length >= 2 && (
+              <MiniElevationChart data={selectedRide.elevationProfile} />
+            )}
+
+            {/* Scrollable media + button area */}
+            <div className="flex-1 overflow-y-auto">
+              {/* YouTube & photos */}
+              {sidebarMedia.length > 0 && (
+                <div className="p-4 space-y-3 border-b border-white/10">
+                  {sidebarMedia.map(m => {
+                    if (m.type === 'YOUTUBE') {
+                      const vid = m.url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([A-Za-z0-9_-]{11})/)?.[1]
+                      if (!vid) return null
+                      return (
+                        <a key={m.id} href={m.url} target="_blank" rel="noopener noreferrer"
+                           className="block relative rounded overflow-hidden group">
+                          <img
+                            src={`https://img.youtube.com/vi/${vid}/hqdefault.jpg`}
+                            alt={m.title ?? ''}
+                            className="w-full object-cover aspect-video"
+                          />
+                          {/* Play button overlay */}
+                          <div className="absolute inset-0 flex items-center justify-center bg-black/40 group-hover:bg-black/55 transition-colors">
+                            <div className="w-10 h-10 rounded-full bg-white/90 flex items-center justify-center">
+                              <svg className="w-4 h-4 text-black ml-0.5" viewBox="0 0 16 16" fill="currentColor">
+                                <path d="M4 2l10 6-10 6z"/>
+                              </svg>
+                            </div>
+                          </div>
+                          {m.title && (
+                            <p className="absolute bottom-0 left-0 right-0 px-2 py-1.5
+                                          text-[11px] text-white bg-black/60 truncate">
+                              {m.title}
+                            </p>
+                          )}
+                        </a>
+                      )
+                    }
+                    if ((m.type === 'STRAVA_PHOTO' || m.type === 'INSTAGRAM') && m.thumbnailUrl) {
+                      return (
+                        <img key={m.id} src={m.thumbnailUrl} alt={m.title ?? ''}
+                             className="w-full rounded object-cover" />
+                      )
+                    }
+                    return null
+                  })}
+                </div>
+              )}
+
+              {/* Navigate button */}
+              <div className="p-5">
+                <button
+                  onClick={() => router.push(selectedRide.url)}
+                  className="w-full py-3 text-sm font-medium text-white
+                             bg-white/10 hover:bg-white/20 rounded
+                             border border-white/20 transition-colors"
+                >
+                  라이드 전체 보기 →
+                </button>
+              </div>
+            </div>
+          </>
+        )}
       </div>
     </div>
   )

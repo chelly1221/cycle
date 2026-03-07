@@ -110,6 +110,7 @@ enum MediaType {
   YOUTUBE
   INSTAGRAM
   STRAVA_ACTIVITY
+  STRAVA_PHOTO
 }
 
 // ─── Site Settings (singleton) ──────────────────────────────────────────────

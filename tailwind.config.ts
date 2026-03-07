@@ -18,6 +18,13 @@ const config: Config = {
       fontFamily: {
         mono: ["var(--font-mono)", "monospace"],
         sans: ["var(--font-sans)", "sans-serif"],
+        "ride-title": [
+          "var(--font-noto-kr)",
+          "var(--font-noto-sc)",
+          "var(--font-noto-tc)",
+          "var(--font-sans)",
+          "sans-serif",
+        ],
       },
     },
   },

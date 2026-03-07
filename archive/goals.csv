@@ -1,0 +1,31 @@
+Goal Type,Activity Type,Goal,Start Date,End Date,Segment ID,Time Period,Interval Time
+Distance Goal,All Ride,20000000.0,"Jan 2, 2022, 11:48:08 AM","Oct 24, 2022, 10:51:54 PM",,Year
+Distance Goal,All Ride,18000000.0,"Oct 25, 2020, 7:32:01 PM","Jan 11, 2021, 8:26:36 PM",,Year
+Elevation Goal,All Ride,100000.0,"Jan 2, 2022, 11:48:19 AM",,,Year
+Distance Goal,All Ride,500000.0,"Oct 20, 2020, 10:25:05 PM","Jan 11, 2021, 8:26:36 PM",,Week
+Distance Goal,All Ride,15000000.0,"Sep 18, 2020, 6:10:48 AM","Oct 25, 2020, 7:32:01 PM",,Year
+Distance Goal,All Ride,500000.0,"Oct 24, 2022, 10:53:08 PM","Oct 24, 2022, 10:54:36 PM",,Week
+Distance Goal,E-Bike Ride,15000000.0,"Apr 5, 2020, 4:22:07 AM","Aug 13, 2020, 2:19:37 PM",,Year
+Distance Goal,All Ride,600000.0,"Mar 6, 2021, 11:16:38 PM","Jan 2, 2022, 11:48:37 AM",,Week
+Distance Goal,All Ride,300000.0,"Oct 16, 2020, 10:15:18 AM","Oct 20, 2020, 10:25:05 PM",,Week
+Elevation Goal,All Ride,70000.0,"Oct 2, 2020, 9:47:10 PM","Oct 20, 2020, 10:25:55 PM",,Year
+Distance Goal,All Ride,480000.0,"Oct 24, 2022, 10:53:03 PM","Oct 24, 2022, 10:53:08 PM",,Week
+Distance Goal,E-Bike Ride,15000000.0,"Aug 27, 2020, 1:54:09 PM","Sep 18, 2020, 6:10:48 AM",,Year
+Distance Goal,E-Bike Ride,500000.0,"Jun 14, 2020, 10:16:58 PM","Sep 18, 2020, 6:10:47 AM",,Week
+Elevation Goal,All Ride,0.0,"Oct 20, 2020, 10:25:55 PM","Jul 3, 2021, 12:57:57 PM",,Year
+Distance Goal,E-Bike Ride,300000.0,"Oct 24, 2019, 3:31:07 PM","Apr 8, 2020, 11:04:17 PM",,Week
+Distance Goal,All Ride,300000.0,"Jan 11, 2021, 8:26:36 PM","Feb 12, 2021, 9:38:05 AM",,Week
+Distance Goal,All Ride,400000.0,"Oct 24, 2022, 10:54:36 PM",,,Week
+Distance Goal,All Ride,15000000.0,"Oct 24, 2022, 10:51:54 PM",,,Year
+Distance Goal,All Ride,500000.0,"Sep 18, 2020, 6:10:47 AM","Oct 16, 2020, 10:15:18 AM",,Week
+Distance Goal,E-Bike Ride,300000.0,"Apr 8, 2020, 11:04:17 PM","Jun 14, 2020, 10:16:58 PM",,Week
+Distance Goal,All Ride,25000000.0,"Jan 11, 2021, 8:26:36 PM","Jan 31, 2021, 5:48:44 PM",,Year
+Distance Goal,E-Bike Ride,16000000.0,"Aug 13, 2020, 2:19:37 PM","Aug 27, 2020, 1:54:09 PM",,Year
+Elevation Goal,All Ride,200000.0,"Jul 3, 2021, 12:57:57 PM","Jan 2, 2022, 11:48:19 AM",,Year
+Distance Goal,E-Bike Ride,5000000.0,"Oct 24, 2019, 3:32:00 PM","Apr 5, 2020, 1:22:07 PM",,Year
+Distance Goal,All Ride,3000000.0,"May 31, 2021, 1:56:18 PM","Jan 2, 2022, 11:48:27 AM",,Month
+Elevation Goal,All Ride,50000.0,"Sep 24, 2020, 6:40:36 PM","Oct 2, 2020, 9:47:10 PM",,Year
+Distance Goal,All Ride,30000000.0,"Jan 31, 2021, 5:48:44 PM","Jan 2, 2022, 11:48:08 AM",,Year
+Distance Goal,All Ride,400000.0,"Jan 2, 2022, 11:48:37 AM","Oct 24, 2022, 10:53:03 PM",,Week
+Distance Goal,All Ride,500000.0,"Feb 12, 2021, 9:38:05 AM","Mar 6, 2021, 11:16:38 PM",,Week
+Distance Goal,All Ride,2000000.0,"Jan 2, 2022, 11:48:27 AM",,,Month

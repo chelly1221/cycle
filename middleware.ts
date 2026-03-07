@@ -1,6 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
 
-export function middleware(req: NextRequest) {
+async function getExpectedToken(): Promise<string | null> {
+  const id = process.env.ADMIN_ID || 'admin'
+  const pass = process.env.ADMIN_PASSWORD
+  if (!pass) return null
+  const data = new TextEncoder().encode(`${id}:${pass}`)
+  const hash = await crypto.subtle.digest('SHA-256', data)
+  return Array.from(new Uint8Array(hash)).map(b => b.toString(16).padStart(2, '0')).join('')
+}
+
+export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl
 
   // Pass through non-page requests
@@ -14,38 +23,31 @@ export function middleware(req: NextRequest) {
     return NextResponse.next()
   }
 
-  // Admin routes — bypass locale redirect, enforce cookie auth
+  // Admin routes — enforce cookie auth, redirect to /login
   if (pathname.startsWith('/admin')) {
-    if (pathname === '/admin/login') return NextResponse.next()
+    const expectedToken = await getExpectedToken()
     const cookie = req.cookies.get('admin_auth')?.value
-    const pass = process.env.ADMIN_PASSWORD
-    if (!pass || cookie !== pass) {
-      return NextResponse.redirect(new URL('/admin/login', req.url))
+    if (!expectedToken || cookie !== expectedToken) {
+      const loginUrl = new URL('/login', req.url)
+      loginUrl.searchParams.set('from', pathname)
+      return NextResponse.redirect(loginUrl)
     }
     return NextResponse.next()
   }
 
-  // Already has /ko prefix
+  // Redirect old /ko/* URLs to root
   if (pathname === '/ko' || pathname.startsWith('/ko/')) {
-    const res = NextResponse.next()
-    res.headers.set('x-locale', 'ko')
-    return res
+    const rest = pathname.replace(/^\/ko/, '') || '/'
+    return NextResponse.redirect(new URL(rest, req.url), 301)
   }
 
-  // Redirect /en/* to /ko/*
+  // Redirect old /en/* URLs to root
   if (pathname === '/en' || pathname.startsWith('/en/')) {
-    const rest = pathname.replace(/^\/en/, '')
-    req.nextUrl.pathname = `/ko${rest}`
-    const res = NextResponse.redirect(req.nextUrl)
-    res.headers.set('x-locale', 'ko')
-    return res
+    const rest = pathname.replace(/^\/en/, '') || '/'
+    return NextResponse.redirect(new URL(rest, req.url), 301)
   }
 
-  // Redirect bare paths to /ko/...
-  req.nextUrl.pathname = `/ko${pathname}`
-  const res = NextResponse.redirect(req.nextUrl)
-  res.headers.set('x-locale', 'ko')
-  return res
+  return NextResponse.next()
 }
 
 export const config = {

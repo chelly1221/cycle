@@ -28,7 +28,6 @@ export interface MediaPanelLabels {
 interface Props {
   pin: MediaPin
   onClose: () => void
-  locale: string
   labels: MediaPanelLabels
 }
 
@@ -43,7 +42,7 @@ function formatTime(sec: number): string {
   return h > 0 ? `${h}h ${m}m` : `${m}m`
 }
 
-export default function MediaPinPanel({ pin, onClose, locale, labels }: Props) {
+export default function MediaPinPanel({ pin, onClose, labels }: Props) {
   const [visible, setVisible] = useState(false)
   const [playingVideoId, setPlayingVideoId] = useState<string | null>(null)
 
@@ -194,7 +193,7 @@ export default function MediaPinPanel({ pin, onClose, locale, labels }: Props) {
 
           {/* View full ride link */}
           <Link
-            href={`/${locale}/rides/${countrySlug}/${pin.rideSlug}`}
+            href={`/rides/${countrySlug}/${pin.rideSlug}`}
             className="block w-full text-center py-2.5 rounded-lg bg-strava/90 hover:bg-strava text-white text-sm font-medium transition-colors"
           >
             {labels.viewRide}

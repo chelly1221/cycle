@@ -1,30 +1,33 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { MediaType } from "@prisma/client";
-
-function isAuthed(req: NextRequest): boolean {
-  const cookie = req.cookies.get("admin_auth")?.value;
-  const pass = process.env.ADMIN_PASSWORD;
-  return !!pass && cookie === pass;
-}
+import { isAuthedRequest } from "@/lib/auth";
 
 export async function POST(
   req: NextRequest,
   { params }: { params: { id: string } }
 ) {
-  if (!isAuthed(req)) {
+  if (!isAuthedRequest(req)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   const body = await req.json().catch(() => ({}));
   const { type, url, title } = body;
 
-  if (!type || !url) {
+  if (!type || !url || typeof url !== "string") {
     return NextResponse.json({ error: "type and url required" }, { status: 400 });
   }
 
-  if (!["YOUTUBE", "INSTAGRAM", "STRAVA_ACTIVITY"].includes(type)) {
+  // Validate media type against actual enum values
+  const ALLOWED_MEDIA_TYPES: string[] = Object.values(MediaType);
+  if (!ALLOWED_MEDIA_TYPES.includes(type)) {
     return NextResponse.json({ error: "Invalid media type" }, { status: 400 });
+  }
+
+  // Validate URL format — must be http(s)
+  const trimmedUrl = url.trim();
+  if (!/^https?:\/\//i.test(trimmedUrl)) {
+    return NextResponse.json({ error: "URL must start with http:// or https://" }, { status: 400 });
   }
 
   try {
@@ -32,7 +35,7 @@ export async function POST(
       data: {
         rideId: params.id,
         type: type as MediaType,
-        url,
+        url: trimmedUrl,
         title: title ?? null,
       },
     });
@@ -46,7 +49,7 @@ export async function DELETE(
   req: NextRequest,
   _context: { params: { id: string } }
 ) {
-  if (!isAuthed(req)) {
+  if (!isAuthedRequest(req)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

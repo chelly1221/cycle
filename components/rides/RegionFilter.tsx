@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import Link from 'next/link'
 import type { RegionData } from '@/lib/regions'
 
@@ -17,7 +17,6 @@ interface Props {
   activeProgram?: string
   virtualPrograms?: VirtualProgram[]
   virtualLabel?: string
-  locale: string
   basePath: string
   allLabel: string
 }
@@ -40,12 +39,16 @@ export default function RegionFilter({
   activeProgram,
   virtualPrograms,
   virtualLabel = 'Virtual',
-  locale,
   basePath,
   allLabel,
 }: Props) {
   const [open, setOpen] = useState<string | null>(null)
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  // Cleanup timer on unmount
+  useEffect(() => {
+    return () => { if (timer.current) clearTimeout(timer.current) }
+  }, [])
 
   const show = (key: string) => {
     if (timer.current) clearTimeout(timer.current)
@@ -67,7 +70,7 @@ export default function RegionFilter({
 
       {/* Region tabs */}
       {regions.map((region) => {
-        const label = locale === 'ko' ? region.labelKo : region.labelEn
+        const label = region.labelKo
         const isActive =
           activeRegion === region.key ||
           region.countries.some((c) => c.code === activeCountry)
@@ -99,7 +102,7 @@ export default function RegionFilter({
                     href={`${basePath}?country=${c.code}`}
                     className={`${dropdownItem} ${activeCountry === c.code ? dropdownItemActive : dropdownItemInactive}`}
                   >
-                    {locale === 'ko' ? c.nameKo : c.nameEn}
+                    {c.nameKo}
                   </Link>
                 ))}
               </div>
@@ -122,21 +125,23 @@ export default function RegionFilter({
             {virtualLabel}
           </Link>
 
-          {open === '__virtual__' && (
+          {open === '__virtual__' && virtualPrograms.some((p) => p.key !== '_placeholder') && (
             <div
               className={dropdownBase}
               onMouseEnter={keep}
               onMouseLeave={hide}
             >
-              {virtualPrograms.map((p) => (
-                <Link
-                  key={p.key}
-                  href={`${basePath}?type=VIRTUAL_RIDE&program=${encodeURIComponent(p.key)}`}
-                  className={`${dropdownItem} ${activeProgram === p.key ? dropdownItemActive : dropdownItemInactive}`}
-                >
-                  {p.label}
-                </Link>
-              ))}
+              {virtualPrograms
+                .filter((p) => p.key !== '_placeholder')
+                .map((p) => (
+                  <Link
+                    key={p.key}
+                    href={`${basePath}?type=VIRTUAL_RIDE&program=${encodeURIComponent(p.key)}`}
+                    className={`${dropdownItem} ${activeProgram === p.key ? dropdownItemActive : dropdownItemInactive}`}
+                  >
+                    {p.label}
+                  </Link>
+                ))}
             </div>
           )}
         </div>

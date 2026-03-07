@@ -22,6 +22,9 @@ export async function getStravaCredentials() {
 
 // ─── Token Management ─────────────────────────────────────────────────────────
 
+// Mutex to prevent concurrent token refresh
+let refreshPromise: Promise<string> | null = null;
+
 export async function getValidToken(): Promise<string> {
   const token = await db.stravaToken.findFirst({
     orderBy: { createdAt: "desc" },
@@ -35,40 +38,53 @@ export async function getValidToken(): Promise<string> {
     return token.accessToken;
   }
 
-  // Token expired — refresh it
-  const creds = await getStravaCredentials();
-  const params = new URLSearchParams({
-    client_id: creds.clientId,
-    client_secret: creds.clientSecret,
-    grant_type: "refresh_token",
-    refresh_token: token.refreshToken,
-  });
-
-  const res = await fetch("https://www.strava.com/oauth/token", {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: params.toString(),
-  });
-
-  if (!res.ok) {
-    const errBody = await res.text().catch(() => "");
-    console.error("[Strava] Token refresh failed:", res.status, errBody);
-    throw new Error(`Strava token refresh failed: ${res.status}`);
+  // If another call is already refreshing, wait for it
+  if (refreshPromise) {
+    return refreshPromise;
   }
 
-  const data = await res.json();
-  const expiresAt = new Date(data.expires_at * 1000);
+  // Token expired — refresh it (with mutex)
+  refreshPromise = (async () => {
+    try {
+      const creds = await getStravaCredentials();
+      const params = new URLSearchParams({
+        client_id: creds.clientId,
+        client_secret: creds.clientSecret,
+        grant_type: "refresh_token",
+        refresh_token: token.refreshToken,
+      });
 
-  await db.stravaToken.update({
-    where: { id: token.id },
-    data: {
-      accessToken: data.access_token,
-      refreshToken: data.refresh_token,
-      expiresAt,
-    },
-  });
+      const res = await fetch("https://www.strava.com/oauth/token", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: params.toString(),
+      });
 
-  return data.access_token;
+      if (!res.ok) {
+        const errBody = await res.text().catch(() => "");
+        console.error("[Strava] Token refresh failed:", res.status, errBody);
+        throw new Error(`Strava token refresh failed: ${res.status}`);
+      }
+
+      const data = await res.json();
+      const expiresAt = new Date(data.expires_at * 1000);
+
+      await db.stravaToken.update({
+        where: { id: token.id },
+        data: {
+          accessToken: data.access_token,
+          refreshToken: data.refresh_token,
+          expiresAt,
+        },
+      });
+
+      return data.access_token as string;
+    } finally {
+      refreshPromise = null;
+    }
+  })();
+
+  return refreshPromise;
 }
 
 // ─── Activity Types ───────────────────────────────────────────────────────────
@@ -95,6 +111,16 @@ export interface StravaActivity {
   weighted_average_watts?: number;
   kudos_count: number;
   description?: string;
+  total_photo_count?: number;
+  trainer?: boolean;  // true if recorded on a trainer/stationary bike
+}
+
+export interface StravaPhoto {
+  unique_id: string;
+  urls: Record<string, string>; // e.g. { "2048": "...", "600": "...", "100": "..." }
+  caption?: string;
+  source: number; // 1 = Strava, 2 = Instagram
+  activity_id: number;
 }
 
 // ─── Activity Fetching ────────────────────────────────────────────────────────
@@ -116,9 +142,10 @@ export async function fetchActivities(
         : {}),
     });
 
-    const res = await fetch(`${STRAVA_BASE}/athlete/activities?${params}`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
+    const res = await fetchWithRetry(
+      `${STRAVA_BASE}/athlete/activities?${params}`,
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
 
     if (!res.ok) {
       throw new Error(`Strava activities fetch failed: ${res.status}`);
@@ -138,12 +165,82 @@ export async function fetchActivityDetail(stravaId: number): Promise<
   StravaActivity & { segment_efforts: unknown[] }
 > {
   const token = await getValidToken();
-  const res = await fetch(`${STRAVA_BASE}/activities/${stravaId}`, {
-    headers: { Authorization: `Bearer ${token}` },
-  });
+  const res = await fetchWithRetry(
+    `${STRAVA_BASE}/activities/${stravaId}`,
+    { headers: { Authorization: `Bearer ${token}` } }
+  );
   if (!res.ok) {
     throw new Error(`Strava activity ${stravaId} fetch failed: ${res.status}`);
   }
+  return res.json();
+}
+
+// ─── Rate-limit helper ───────────────────────────────────────────────────────
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+async function fetchWithRetry(
+  url: string,
+  opts: RequestInit,
+  retries = 5
+): Promise<Response> {
+  for (let i = 0; i < retries; i++) {
+    const res = await fetch(url, opts);
+    if (res.status === 429) {
+      // Strava rate limit — exponential backoff (60s, 120s, 240s, 480s, 900s)
+      const wait = Math.min(900_000, 60_000 * Math.pow(2, i));
+      console.log(`[Strava] Rate limited, waiting ${Math.round(wait / 1000)}s (attempt ${i + 1}/${retries})...`);
+      await sleep(wait);
+      continue;
+    }
+    return res;
+  }
+  // Final attempt
+  return fetch(url, opts);
+}
+
+// ─── Activity Streams ─────────────────────────────────────────────────────────
+
+export interface StravaStreams {
+  altitude?: { data: number[] }
+  distance?: { data: number[] }
+}
+
+export async function fetchActivityStreams(activityId: number): Promise<StravaStreams> {
+  const token = await getValidToken();
+  const res = await fetchWithRetry(
+    `${STRAVA_BASE}/activities/${activityId}/streams?keys=altitude,distance&key_by_type=true`,
+    { headers: { Authorization: `Bearer ${token}` } }
+  );
+  if (!res.ok) {
+    if (res.status === 404) return {};
+    throw new Error(`Strava streams fetch failed for ${activityId}: ${res.status}`);
+  }
+  return res.json();
+}
+
+// ─── Photo Fetching ──────────────────────────────────────────────────────────
+
+export async function fetchActivityPhotos(
+  activityId: number,
+  size = 2048
+): Promise<StravaPhoto[]> {
+  const token = await getValidToken();
+  const params = new URLSearchParams({
+    size: String(size),
+    photo_sources: "true",
+  });
+
+  const res = await fetchWithRetry(
+    `${STRAVA_BASE}/activities/${activityId}/photos?${params}`,
+    { headers: { Authorization: `Bearer ${token}` } }
+  );
+
+  if (!res.ok) {
+    console.error(`[Strava] Photos fetch failed for activity ${activityId}: ${res.status}`);
+    return [];
+  }
+
   return res.json();
 }
 
